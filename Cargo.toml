@@ -1,18 +1,20 @@
 [package]
-name = "xsv"
-version = "0.13.0"  #:version
-authors = ["Andrew Gallant <jamslam@gmail.com>"]
-description = "A high performance CSV command line toolkit."
-documentation = "https://burntsushi.net/rustdoc/xsv/"
-homepage = "https://github.com/BurntSushi/xsv"
-repository = "https://github.com/BurntSushi/xsv"
+name = "dsv"
+version = "0.13.0"
+authors = ["dsv contributors", "Andrew Gallant <jamslam@gmail.com>"]
+description = "dsv (Data Swiss Knife) — a high-performance CSV, Parquet, and JSONL CLI toolkit. Modern xsv fork with all 33 community PRs merged."
+homepage = "https://github.com/ssmurfgg04-gif/dsv"
+repository = "https://github.com/ssmurfgg04-gif/dsv"
 readme = "README.md"
-keywords = ["csv", "tsv", "slice", "command"]
+keywords = ["csv", "tsv", "parquet", "jsonl", "xsv", "cli", "csv-toolkit", "data-wrangling", "command-line", "csv-parser", "data-engineering", "etl"]
+categories = ["command-line-utilities", "data-structures"]
 license = "Unlicense/MIT"
 autotests = false
+edition = "2021"
+rust-version = "1.85"
 
 [[bin]]
-name = "xsv"
+name = "dsv"
 test = false
 bench = false
 doctest = false
@@ -20,29 +22,42 @@ doctest = false
 [[test]]
 name = "tests"
 
+[features]
+default = ["parquet", "jsonl"]
+parquet = ["dep:parquet", "dep:arrow"]
+jsonl = ["dep:serde_json"]
+
 [profile.release]
 opt-level = 3
-debug = true
+debug = false
+strip = "symbols"
+lto = "thin"
+codegen-units = 1
 
 [profile.test]
 opt-level = 3
 
 [dependencies]
+anyhow = "1"
 byteorder = "1"
-crossbeam-channel = "0.2.4"
-csv = "1"
-csv-index = "0.1.5"
-docopt = "1"
-filetime = "0.1"
-num_cpus = "1.4"
-rand = "0.5"
+crossbeam-channel = "0.5"
+csv = "1.3"
+csv-index = "0.1"
+filetime = "0.2"
+num_cpus = "1.16"
+rand = "0.8"
 regex = "1"
-serde = "1"
-serde_derive = "1"
+serde = { version = "1", features = ["derive"] }
 streaming-stats = "0.2"
 tabwriter = "1"
-threadpool = "1.3"
+threadpool = "1.8"
+thiserror = "2"
+clap = { version = "4", features = ["derive"] }
+
+parquet = { version = "53", optional = true, default-features = false, features = ["arrow"] }
+arrow = { version = "53", optional = true, default-features = false }
+serde_json = { version = "1", optional = true }
 
 [dev-dependencies]
-quickcheck = { version = "0.7", default-features = false }
+quickcheck = { version = "1", default-features = false }
 log = "0.4"

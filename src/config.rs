@@ -1,53 +1,45 @@
-#[allow(deprecated, unused_imports)]
-use std::ascii::AsciiExt;
 use std::borrow::ToOwned;
 use std::env;
 use std::fs;
 use std::io::{self, Read};
 use std::ops::Deref;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use csv;
-use index::Indexed;
-use serde::de::{Deserializer, Deserialize, Error};
+use crate::index::Indexed;
 
-use CliResult;
-use select::{SelectColumns, Selection};
-use util;
+use crate::CliResult;
+use crate::data::{DataReader, Format};
+use crate::select::Selection;
+use crate::util;
 
 
 #[derive(Clone, Copy, Debug)]
 pub struct Delimiter(pub u8);
 
-/// Delimiter represents values that can be passed from the command line that
-/// can be used as a field delimiter in CSV data.
-///
-/// Its purpose is to ensure that the Unicode character given decodes to a
-/// valid ASCII character as required by the CSV parser.
 impl Delimiter {
     pub fn as_byte(self) -> u8 {
         self.0
     }
 }
 
-impl<'de> Deserialize<'de> for Delimiter {
-    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Delimiter, D::Error> {
-        let c = String::deserialize(d)?;
-        match &*c {
+impl FromStr for Delimiter {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Delimiter, String> {
+        match s {
             r"\t" => Ok(Delimiter(b'\t')),
             s => {
-                if s.len() != 1 {
-                    let msg = format!("Could not convert '{}' to a single \
-                                       ASCII character.", s);
-                    return Err(D::Error::custom(msg));
+                let bytes = s.as_bytes();
+                if bytes.len() != 1 {
+                    return Err(format!(
+                        "Could not convert '{}' to a single ASCII character.", s));
                 }
-                let c = s.chars().next().unwrap();
+                let c = bytes[0];
                 if c.is_ascii() {
-                    Ok(Delimiter(c as u8))
+                    Ok(Delimiter(c))
                 } else {
-                    let msg = format!("Could not convert '{}' \
-                                       to ASCII delimiter.", c);
-                    Err(D::Error::custom(msg))
+                    Err(format!("Could not convert '{}' to ASCII delimiter.", s))
                 }
             }
         }
@@ -58,7 +50,7 @@ impl<'de> Deserialize<'de> for Delimiter {
 pub struct Config {
     path: Option<PathBuf>, // None implies <stdin>
     idx_path: Option<PathBuf>,
-    select_columns: Option<SelectColumns>,
+    select_columns: Option<crate::select::SelectColumns>,
     delimiter: u8,
     pub no_headers: bool,
     flexible: bool,
@@ -161,7 +153,7 @@ impl Config {
         self
     }
 
-    pub fn select(mut self, sel_cols: SelectColumns) -> Config {
+    pub fn select(mut self, sel_cols: crate::select::SelectColumns) -> Config {
         self.select_columns = Some(sel_cols);
         self
     }
@@ -194,13 +186,19 @@ impl Config {
     }
 
     pub fn writer(&self)
-                 -> io::Result<csv::Writer<Box<io::Write+'static>>> {
+                 -> io::Result<csv::Writer<Box<dyn io::Write+'static>>> {
         Ok(self.from_writer(self.io_writer()?))
     }
 
     pub fn reader(&self)
-                 -> io::Result<csv::Reader<Box<io::Read+'static>>> {
+                 -> io::Result<csv::Reader<Box<dyn io::Read+'static>>> {
         Ok(self.from_reader(self.io_reader()?))
+    }
+
+    pub fn data_reader(&self, fmt: Format) -> CliResult<DataReader> {
+        let file: Box<dyn io::Read> = self.io_reader()?;
+        let delim = Some(self.delimiter);
+        DataReader::from_reader(file, fmt, delim, self.no_headers)
     }
 
     pub fn reader_file(&self) -> io::Result<csv::Reader<fs::File>> {
@@ -260,7 +258,7 @@ impl Config {
         }
     }
 
-    pub fn io_reader(&self) -> io::Result<Box<io::Read+'static>> {
+    pub fn io_reader(&self) -> io::Result<Box<dyn io::Read+'static>> {
         Ok(match self.path {
                 None => Box::new(io::stdin()),
                 Some(ref p) => {
@@ -290,7 +288,7 @@ impl Config {
             .from_reader(rdr)
     }
 
-    pub fn io_writer(&self) -> io::Result<Box<io::Write+'static>> {
+    pub fn io_writer(&self) -> io::Result<Box<dyn io::Write+'static>> {
         Ok(match self.path {
             None => Box::new(io::stdout()),
             Some(ref p) => Box::new(fs::File::create(p)?),

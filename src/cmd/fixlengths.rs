@@ -2,47 +2,23 @@ use std::cmp;
 
 use csv;
 
-use CliResult;
-use config::{Config, Delimiter};
-use util;
+use crate::CliResult;
+use crate::config::{Config, Delimiter};
+use clap::Parser;
 
-static USAGE: &'static str = "
-Transforms CSV data so that all records have the same length. The length is
-the length of the longest record in the data (not counting trailing empty fields,
-but at least 1). Records with smaller lengths are padded with empty fields.
-
-This requires two complete scans of the CSV data: one for determining the
-record size and one for the actual transform. Because of this, the input
-given must be a file and not stdin.
-
-Alternatively, if --length is set, then all records are forced to that length.
-This requires a single pass and can be done with stdin.
-
-Usage:
-    xsv fixlengths [options] [<input>]
-
-fixlengths options:
-    -l, --length <arg>     Forcefully set the length of each record. If a
-                           record is not the size given, then it is truncated
-                           or expanded as appropriate.
-
-Common options:
-    -h, --help             Display this message
-    -o, --output <file>    Write output to <file> instead of stdout.
-    -d, --delimiter <arg>  The field delimiter for reading CSV data.
-                           Must be a single character. (default: ,)
-";
-
-#[derive(Deserialize)]
-struct Args {
-    arg_input: Option<String>,
-    flag_length: Option<usize>,
-    flag_output: Option<String>,
-    flag_delimiter: Option<Delimiter>,
+#[derive(Parser, Debug)]
+pub struct Args {
+#[arg()]
+    pub arg_input: Option<String>,
+    #[arg(short = 'l', long = "length", value_name = "arg")]
+    pub flag_length: Option<usize>,
+#[arg(short = 'o', long = "output", value_name = "file")]
+    pub flag_output: Option<String>,
+#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    pub flag_delimiter: Option<Delimiter>,
 }
 
-pub fn run(argv: &[&str]) -> CliResult<()> {
-    let args: Args = util::get_args(USAGE, argv)?;
+pub fn run(args: &Args) -> CliResult<()> {
     let config = Config::new(&args.arg_input)
         .delimiter(args.flag_delimiter)
         .no_headers(true)

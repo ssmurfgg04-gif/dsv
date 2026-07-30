@@ -8,90 +8,45 @@ use std::str;
 use byteorder::{WriteBytesExt, BigEndian};
 use csv;
 
-use CliResult;
-use config::{Config, Delimiter};
-use index::Indexed;
-use select::{SelectColumns, Selection};
-use util;
-
-static USAGE: &'static str = "
-Joins two sets of CSV data on the specified columns.
-
-The default join operation is an 'inner' join. This corresponds to the
-intersection of rows on the keys specified.
-
-Joins are always done by ignoring leading and trailing whitespace. By default,
-joins are done case sensitively, but this can be disabled with the --no-case
-flag.
-
-The columns arguments specify the columns to join for each input. Columns can
-be referenced by name or index, starting at 1. Specify multiple columns by
-separating them with a comma. Specify a range of columns with `-`. Both
-columns1 and columns2 must specify exactly the same number of columns.
-(See 'xsv select --help' for the full syntax.)
-
-Usage:
-    xsv join [options] <columns1> <input1> <columns2> <input2>
-    xsv join --help
-
-join options:
-    --no-case              When set, joins are done case insensitively.
-    --left                 Do a 'left outer' join. This returns all rows in
-                           first CSV data set, including rows with no
-                           corresponding row in the second data set. When no
-                           corresponding row exists, it is padded out with
-                           empty fields.
-    --right                Do a 'right outer' join. This returns all rows in
-                           second CSV data set, including rows with no
-                           corresponding row in the first data set. When no
-                           corresponding row exists, it is padded out with
-                           empty fields. (This is the reverse of 'outer left'.)
-    --full                 Do a 'full outer' join. This returns all rows in
-                           both data sets with matching records joined. If
-                           there is no match, the missing side will be padded
-                           out with empty fields. (This is the combination of
-                           'outer left' and 'outer right'.)
-    --cross                USE WITH CAUTION.
-                           This returns the cartesian product of the CSV
-                           data sets given. The number of rows return is
-                           equal to N * M, where N and M correspond to the
-                           number of rows in the given data sets, respectively.
-    --nulls                When set, joins will work on empty fields.
-                           Otherwise, empty fields are completely ignored.
-                           (In fact, any row that has an empty field in the
-                           key specified is ignored.)
-
-Common options:
-    -h, --help             Display this message
-    -o, --output <file>    Write output to <file> instead of stdout.
-    -n, --no-headers       When set, the first row will not be interpreted
-                           as headers. (i.e., They are not searched, analyzed,
-                           sliced, etc.)
-    -d, --delimiter <arg>  The field delimiter for reading CSV data.
-                           Must be a single character. (default: ,)
-";
+use crate::CliResult;
+use crate::config::{Config, Delimiter};
+use crate::index::Indexed;
+use crate::select::{SelectColumns, Selection};
+use clap::Parser;
 
 type ByteString = Vec<u8>;
 
-#[derive(Deserialize)]
-struct Args {
-    arg_columns1: SelectColumns,
-    arg_input1: String,
-    arg_columns2: SelectColumns,
-    arg_input2: String,
-    flag_left: bool,
-    flag_right: bool,
-    flag_full: bool,
-    flag_cross: bool,
-    flag_output: Option<String>,
-    flag_no_headers: bool,
-    flag_no_case: bool,
-    flag_nulls: bool,
-    flag_delimiter: Option<Delimiter>,
+#[derive(Parser, Debug)]
+pub struct Args {
+#[arg()]
+    pub arg_columns1: SelectColumns,
+#[arg()]
+    pub arg_input1: String,
+#[arg()]
+    pub arg_columns2: SelectColumns,
+#[arg()]
+    pub arg_input2: String,
+#[arg(long = "left")]
+    pub flag_left: bool,
+#[arg(long = "right")]
+    pub flag_right: bool,
+#[arg(long = "full")]
+    pub flag_full: bool,
+#[arg(long = "cross")]
+    pub flag_cross: bool,
+#[arg(short = 'o', long = "output", value_name = "file")]
+    pub flag_output: Option<String>,
+#[arg(short = 'n', long = "no-headers")]
+    pub flag_no_headers: bool,
+#[arg(long = "no-case")]
+    pub flag_no_case: bool,
+#[arg(long = "nulls")]
+    pub flag_nulls: bool,
+#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    pub flag_delimiter: Option<Delimiter>,
 }
 
-pub fn run(argv: &[&str]) -> CliResult<()> {
-    let args: Args = util::get_args(USAGE, argv)?;
+pub fn run(args: &Args) -> CliResult<()> {
     let mut state = args.new_io_state()?;
     match (
         args.flag_left,
@@ -278,7 +233,7 @@ impl<R: io::Read + io::Seek, W: io::Write> IoState<R, W> {
 
 impl Args {
     fn new_io_state(&self)
-        -> CliResult<IoState<fs::File, Box<io::Write+'static>>> {
+        -> CliResult<IoState<fs::File, Box<dyn io::Write+'static>>> {
         let rconf1 = Config::new(&Some(self.arg_input1.clone()))
             .delimiter(self.flag_delimiter)
             .no_headers(self.flag_no_headers)

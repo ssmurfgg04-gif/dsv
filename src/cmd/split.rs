@@ -2,63 +2,35 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use channel;
+use crossbeam_channel;
 use csv;
 use threadpool::ThreadPool;
 
-use CliResult;
-use config::{Config, Delimiter};
-use index::Indexed;
-use util::{self, FilenameTemplate};
+use crate::CliResult;
+use crate::config::{Config, Delimiter};
+use crate::index::Indexed;
+use crate::util::{self, FilenameTemplate};
+use clap::Parser;
 
-static USAGE: &'static str = "
-Splits the given CSV data into chunks.
-
-The files are written to the directory given with the name '{start}.csv',
-where {start} is the index of the first record of the chunk (starting at 0).
-
-Usage:
-    xsv split [options] <outdir> [<input>]
-    xsv split --help
-
-split options:
-    -s, --size <arg>       The number of records to write into each chunk.
-                           [default: 500]
-    -j, --jobs <arg>       The number of spliting jobs to run in parallel.
-                           This only works when the given CSV data has
-                           an index already created. Note that a file handle
-                           is opened for each job.
-                           When set to '0', the number of jobs is set to the
-                           number of CPUs detected.
-                           [default: 0]
-    --filename <filename>  A filename template to use when constructing
-                           the names of the output files.  The string '{}'
-                           will be replaced by a value based on the value
-                           of the field, but sanitized for shell safety.
-                           [default: {}.csv]
-
-Common options:
-    -h, --help             Display this message
-    -n, --no-headers       When set, the first row will NOT be interpreted
-                           as column names. Otherwise, the first row will
-                           appear in all chunks as the header row.
-    -d, --delimiter <arg>  The field delimiter for reading CSV data.
-                           Must be a single character. (default: ,)
-";
-
-#[derive(Clone, Deserialize)]
-struct Args {
-    arg_input: Option<String>,
-    arg_outdir: String,
-    flag_size: usize,
-    flag_jobs: usize,
-    flag_filename: FilenameTemplate,
-    flag_no_headers: bool,
-    flag_delimiter: Option<Delimiter>,
+#[derive(Parser, Clone, Debug)]
+pub struct Args {
+#[arg()]
+    pub arg_outdir: String,
+#[arg()]
+    pub arg_input: Option<String>,
+#[arg(long = "size", value_name = "arg")]
+    pub flag_size: usize,
+#[arg(short = 'j', long = "jobs", value_name = "arg", default_value_t = 0)]
+    pub flag_jobs: usize,
+#[arg(long = "filename", value_name = "arg", default_value = "{}.csv")]
+    pub flag_filename: FilenameTemplate,
+#[arg(short = 'n', long = "no-headers")]
+    pub flag_no_headers: bool,
+#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    pub flag_delimiter: Option<Delimiter>,
 }
 
-pub fn run(argv: &[&str]) -> CliResult<()> {
-    let args: Args = util::get_args(USAGE, argv)?;
+pub fn run(args: &Args) -> CliResult<()> {
     if args.flag_size == 0 {
         return fail!("--size must be greater than 0.");
     }
@@ -98,7 +70,7 @@ impl Args {
         let nchunks = util::num_of_chunks(
             idx.count() as usize, self.flag_size);
         let pool = ThreadPool::new(self.njobs());
-        let (tx, rx) = channel::bounded::<()>(0);
+        let (tx, rx) = crossbeam_channel::bounded::<()>(0);
         for i in 0..nchunks {
             let args = self.clone();
             let tx = tx.clone();
@@ -120,7 +92,7 @@ impl Args {
             });
         }
         drop(tx);
-        rx.recv();
+        let _ = rx.recv();
         Ok(())
     }
 
@@ -128,7 +100,7 @@ impl Args {
         &self,
         headers: &csv::ByteRecord,
         start: usize,
-    ) -> CliResult<csv::Writer<Box<io::Write+'static>>> {
+    ) -> CliResult<csv::Writer<Box<dyn io::Write+'static>>> {
         let dir = Path::new(&self.arg_outdir);
         let path = dir.join(self.flag_filename.filename(&format!("{}", start)));
         let spath = Some(path.display().to_string());
@@ -147,7 +119,7 @@ impl Args {
 
     fn njobs(&self) -> usize {
         if self.flag_jobs == 0 {
-            util::num_cpus()
+            num_cpus::get()
         } else {
             self.flag_jobs
         }

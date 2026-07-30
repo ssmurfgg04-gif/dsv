@@ -6,84 +6,47 @@ use std::io;
 use std::iter::{FromIterator, repeat};
 use std::str::{self, FromStr};
 
-use channel;
+use crossbeam_channel;
 use csv;
 use stats::{Commute, OnlineStats, MinMax, Unsorted, merge_all};
 use threadpool::ThreadPool;
 
-use CliResult;
-use config::{Config, Delimiter};
-use index::Indexed;
-use select::{SelectColumns, Selection};
-use util;
+use crate::CliResult;
+use crate::config::{Config, Delimiter};
+use crate::index::Indexed;
+use crate::select::{SelectColumns, Selection};
+use crate::util;
 
 use self::FieldType::{TUnknown, TNull, TUnicode, TFloat, TInteger};
+use clap::Parser;
 
-static USAGE: &'static str = "
-Computes basic statistics on CSV data.
-
-Basic statistics includes mean, median, mode, standard deviation, sum, max and
-min values. Note that some statistics are expensive to compute, so they must
-be enabled explicitly. By default, the following statistics are reported for
-*every* column in the CSV data: mean, max, min and standard deviation. The
-default set of statistics corresponds to statistics that can be computed
-efficiently on a stream of data (i.e., constant memory).
-
-Computing statistics on a large file can be made much faster if you create
-an index for it first with 'xsv index'.
-
-Usage:
-    xsv stats [options] [<input>]
-
-stats options:
-    -s, --select <arg>     Select a subset of columns to compute stats for.
-                           See 'xsv select --help' for the format details.
-                           This is provided here because piping 'xsv select'
-                           into 'xsv stats' will disable the use of indexing.
-    --everything           Show all statistics available.
-    --mode                 Show the mode.
-                           This requires storing all CSV data in memory.
-    --cardinality          Show the cardinality.
-                           This requires storing all CSV data in memory.
-    --median               Show the median.
-                           This requires storing all CSV data in memory.
-    --nulls                Include NULLs in the population size for computing
-                           mean and standard deviation.
-    -j, --jobs <arg>       The number of jobs to run in parallel.
-                           This works better when the given CSV data has
-                           an index already created. Note that a file handle
-                           is opened for each job.
-                           When set to '0', the number of jobs is set to the
-                           number of CPUs detected.
-                           [default: 0]
-
-Common options:
-    -h, --help             Display this message
-    -o, --output <file>    Write output to <file> instead of stdout.
-    -n, --no-headers       When set, the first row will NOT be interpreted
-                           as column names. i.e., They will be included
-                           in statistics.
-    -d, --delimiter <arg>  The field delimiter for reading CSV data.
-                           Must be a single character. (default: ,)
-";
-
-#[derive(Clone, Deserialize)]
-struct Args {
-    arg_input: Option<String>,
-    flag_select: SelectColumns,
-    flag_everything: bool,
-    flag_mode: bool,
-    flag_cardinality: bool,
-    flag_median: bool,
-    flag_nulls: bool,
-    flag_jobs: usize,
-    flag_output: Option<String>,
-    flag_no_headers: bool,
-    flag_delimiter: Option<Delimiter>,
+#[derive(Parser, Clone, Debug)]
+pub struct Args {
+#[arg()]
+    pub arg_input: Option<String>,
+#[arg(short = 's', long = "select", default_value = "")]
+    pub flag_select: SelectColumns,
+#[arg(long = "everything")]
+    pub flag_everything: bool,
+    #[arg(long = "mode")]
+    pub flag_mode: bool,
+    #[arg(long = "cardinality")]
+    pub flag_cardinality: bool,
+#[arg(long = "median")]
+    pub flag_median: bool,
+#[arg(long = "nulls")]
+    pub flag_nulls: bool,
+#[arg(short = 'j', long = "jobs", value_name = "arg", default_value_t = 0)]
+    pub flag_jobs: usize,
+#[arg(short = 'o', long = "output", value_name = "file")]
+    pub flag_output: Option<String>,
+#[arg(short = 'n', long = "no-headers")]
+    pub flag_no_headers: bool,
+#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    pub flag_delimiter: Option<Delimiter>,
 }
 
-pub fn run(argv: &[&str]) -> CliResult<()> {
-    let args: Args = util::get_args(USAGE, argv)?;
+pub fn run(args: &Args) -> CliResult<()> {
 
     let mut wtr = Config::new(&args.flag_output).writer()?;
     let (headers, stats) = match args.rconfig().indexed()? {
@@ -139,18 +102,18 @@ impl Args {
         let nchunks = util::num_of_chunks(idx.count() as usize, chunk_size);
 
         let pool = ThreadPool::new(self.njobs());
-        let (send, recv) = channel::bounded(0);
+        let (send, recv) = crossbeam_channel::bounded(0);
         for i in 0..nchunks {
             let (send, args, sel) = (send.clone(), self.clone(), sel.clone());
             pool.execute(move || {
                 let mut idx = args.rconfig().indexed().unwrap().unwrap();
                 idx.seek((i * chunk_size) as u64).unwrap();
                 let it = idx.byte_records().take(chunk_size);
-                send.send(args.compute(&sel, it).unwrap());
+                let _ = send.send(args.compute(&sel, it).unwrap());
             });
         }
         drop(send);
-        Ok((headers, merge_all(recv).unwrap_or_else(Vec::new)))
+        Ok((headers, merge_all(recv.into_iter()).unwrap_or_else(Vec::new)))
     }
 
     fn stats_to_records(&self, stats: Vec<Stats>) -> Vec<csv::StringRecord> {
@@ -160,9 +123,9 @@ impl Args {
         let pool = ThreadPool::new(self.njobs());
         let mut results = vec![];
         for mut stat in stats.into_iter() {
-            let (send, recv) = channel::bounded(0);
+            let (send, recv) = crossbeam_channel::bounded(0);
             results.push(recv);
-            pool.execute(move || { send.send(stat.to_record()); });
+            pool.execute(move || { let _ = send.send(stat.to_record()); });
         }
         for (i, recv) in results.into_iter().enumerate() {
             records[i] = recv.recv().unwrap();
@@ -199,7 +162,7 @@ impl Args {
     }
 
     fn njobs(&self) -> usize {
-        if self.flag_jobs == 0 { util::num_cpus() } else { self.flag_jobs }
+        if self.flag_jobs == 0 { num_cpus::get() } else { self.flag_jobs }
     }
 
     fn new_stats(&self, record_len: usize) -> Vec<Stats> {

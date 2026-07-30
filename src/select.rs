@@ -7,7 +7,6 @@ use std::slice;
 use std::str::FromStr;
 
 use csv;
-use serde::de::{Deserializer, Deserialize, Error};
 
 #[derive(Clone)]
 pub struct SelectColumns {
@@ -16,6 +15,10 @@ pub struct SelectColumns {
 }
 
 impl SelectColumns {
+    pub fn is_empty(&self) -> bool {
+        self.selectors.is_empty()
+    }
+
     fn parse(mut s: &str) -> Result<SelectColumns, String> {
         let invert =
             if !s.is_empty() && s.as_bytes()[0] == b'!' {
@@ -76,12 +79,10 @@ impl fmt::Debug for SelectColumns {
     }
 }
 
-impl<'de> Deserialize<'de> for SelectColumns {
-    fn deserialize<D: Deserializer<'de>>(
-        d: D,
-    ) -> Result<SelectColumns, D::Error> {
-        let raw = String::deserialize(d)?;
-        SelectColumns::parse(&raw).map_err(|e| D::Error::custom(&e))
+impl FromStr for SelectColumns {
+    type Err = String;
+    fn from_str(s: &str) -> Result<SelectColumns, String> {
+        SelectColumns::parse(s)
     }
 }
 

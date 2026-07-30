@@ -1,60 +1,33 @@
 use std::fs;
 
 
-use CliResult;
-use config::{Config, Delimiter};
-use index::Indexed;
-use util;
+use crate::CliResult;
+use crate::config::{Config, Delimiter};
+use crate::index::Indexed;
+use crate::util;
+use clap::Parser;
 
-static USAGE: &'static str = "
-Returns the rows in the range specified (starting at 0, half-open interval).
-The range does not include headers.
-
-If the start of the range isn't specified, then the slice starts from the first
-record in the CSV data.
-
-If the end of the range isn't specified, then the slice continues to the last
-record in the CSV data.
-
-This operation can be made much faster by creating an index with 'xsv index'
-first. Namely, a slice on an index requires parsing just the rows that are
-sliced. Without an index, all rows up to the first row in the slice must be
-parsed.
-
-Usage:
-    xsv slice [options] [<input>]
-
-slice options:
-    -s, --start <arg>      The index of the record to slice from.
-    -e, --end <arg>        The index of the record to slice to.
-    -l, --len <arg>        The length of the slice (can be used instead
-                           of --end).
-    -i, --index <arg>      Slice a single record (shortcut for -s N -l 1).
-
-Common options:
-    -h, --help             Display this message
-    -o, --output <file>    Write output to <file> instead of stdout.
-    -n, --no-headers       When set, the first row will not be interpreted
-                           as headers. Otherwise, the first row will always
-                           appear in the output as the header row.
-    -d, --delimiter <arg>  The field delimiter for reading CSV data.
-                           Must be a single character. (default: ,)
-";
-
-#[derive(Deserialize)]
-struct Args {
-    arg_input: Option<String>,
-    flag_start: Option<usize>,
-    flag_end: Option<usize>,
-    flag_len: Option<usize>,
-    flag_index: Option<usize>,
-    flag_output: Option<String>,
-    flag_no_headers: bool,
-    flag_delimiter: Option<Delimiter>,
+#[derive(Parser, Debug)]
+pub struct Args {
+#[arg()]
+    pub arg_input: Option<String>,
+#[arg(short = 's', long = "start", value_name = "arg")]
+    pub flag_start: Option<usize>,
+#[arg(short = 'e', long = "end", value_name = "arg")]
+    pub flag_end: Option<usize>,
+#[arg(short = 'l', long = "len", value_name = "arg")]
+    pub flag_len: Option<usize>,
+#[arg(short = 'i', long = "index", value_name = "arg")]
+    pub flag_index: Option<usize>,
+#[arg(short = 'o', long = "output", value_name = "file")]
+    pub flag_output: Option<String>,
+#[arg(short = 'n', long = "no-headers")]
+    pub flag_no_headers: bool,
+#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    pub flag_delimiter: Option<Delimiter>,
 }
 
-pub fn run(argv: &[&str]) -> CliResult<()> {
-    let args: Args = util::get_args(USAGE, argv)?;
+pub fn run(args: &Args) -> CliResult<()> {
     match args.rconfig().indexed()? {
         None => args.no_index(),
         Some(idxed) => args.with_index(idxed),

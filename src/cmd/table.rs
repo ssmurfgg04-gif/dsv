@@ -3,51 +3,28 @@ use std::borrow::Cow;
 use csv;
 use tabwriter::TabWriter;
 
-use CliResult;
-use config::{Config, Delimiter};
-use util;
+use crate::CliResult;
+use crate::config::{Config, Delimiter};
+use crate::util;
+use clap::Parser;
 
-static USAGE: &'static str = "
-Outputs CSV data as a table with columns in alignment.
-
-This will not work well if the CSV data contains large fields.
-
-Note that formatting a table requires buffering all CSV data into memory.
-Therefore, you should use the 'sample' or 'slice' command to trim down large
-CSV data before formatting it with this command.
-
-Usage:
-    xsv table [options] [<input>]
-
-table options:
-    -w, --width <arg>      The minimum width of each column.
-                           [default: 2]
-    -p, --pad <arg>        The minimum number of spaces between each column.
-                           [default: 2]
-    -c, --condense <arg>  Limits the length of each field to the value
-                           specified. If the field is UTF-8 encoded, then
-                           <arg> refers to the number of code points.
-                           Otherwise, it refers to the number of bytes.
-
-Common options:
-    -h, --help             Display this message
-    -o, --output <file>    Write output to <file> instead of stdout.
-    -d, --delimiter <arg>  The field delimiter for reading CSV data.
-                           Must be a single character. (default: ,)
-";
-
-#[derive(Deserialize)]
-struct Args {
-    arg_input: Option<String>,
-    flag_width: usize,
-    flag_pad: usize,
-    flag_output: Option<String>,
-    flag_delimiter: Option<Delimiter>,
-    flag_condense: Option<usize>,
+#[derive(Parser, Debug)]
+pub struct Args {
+#[arg()]
+    pub arg_input: Option<String>,
+#[arg(short = 'w', long = "width", value_name = "arg", default_value_t = 1)]
+    pub flag_width: usize,
+#[arg(short = 'p', long = "pad", default_value_t = 2)]
+    pub flag_pad: usize,
+#[arg(short = 'o', long = "output", value_name = "file")]
+    pub flag_output: Option<String>,
+#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    pub flag_delimiter: Option<Delimiter>,
+#[arg(short = 'c', long = "condense", value_name = "arg")]
+    pub flag_condense: Option<usize>,
 }
 
-pub fn run(argv: &[&str]) -> CliResult<()> {
-    let args: Args = util::get_args(USAGE, argv)?;
+pub fn run(args: &Args) -> CliResult<()> {
     let rconfig = Config::new(&args.arg_input)
         .delimiter(args.flag_delimiter)
         .no_headers(true);

@@ -1,80 +1,41 @@
 use std::fs;
 use std::io;
 
-use channel;
+use crossbeam_channel;
 use csv;
 use stats::{Frequencies, merge_all};
 use threadpool::ThreadPool;
 
-use CliResult;
-use config::{Config, Delimiter};
-use index::Indexed;
-use select::{SelectColumns, Selection};
-use util;
+use crate::CliResult;
+use crate::config::{Config, Delimiter};
+use crate::index::Indexed;
+use crate::select::{SelectColumns, Selection};
+use crate::util;
+use clap::Parser;
 
-static USAGE: &'static str = "
-Compute a frequency table on CSV data.
-
-The frequency table is formatted as CSV data:
-
-    field,value,count
-
-By default, there is a row for the N most frequent values for each field in the
-data. The order and number of values can be tweaked with --asc and --limit,
-respectively.
-
-Since this computes an exact frequency table, memory proportional to the
-cardinality of each column is required.
-
-Usage:
-    xsv frequency [options] [<input>]
-
-frequency options:
-    -s, --select <arg>     Select a subset of columns to compute frequencies
-                           for. See 'xsv select --help' for the format
-                           details. This is provided here because piping 'xsv
-                           select' into 'xsv frequency' will disable the use
-                           of indexing.
-    -l, --limit <arg>      Limit the frequency table to the N most common
-                           items. Set to '0' to disable a limit.
-                           [default: 10]
-    -a, --asc              Sort the frequency tables in ascending order by
-                           count. The default is descending order.
-    --no-nulls             Don't include NULLs in the frequency table.
-    -j, --jobs <arg>       The number of jobs to run in parallel.
-                           This works better when the given CSV data has
-                           an index already created. Note that a file handle
-                           is opened for each job.
-                           When set to '0', the number of jobs is set to the
-                           number of CPUs detected.
-                           [default: 0]
-
-Common options:
-    -h, --help             Display this message
-    -o, --output <file>    Write output to <file> instead of stdout.
-    -n, --no-headers       When set, the first row will NOT be included
-                           in the frequency table. Additionally, the 'field'
-                           column will be 1-based indices instead of header
-                           names.
-    -d, --delimiter <arg>  The field delimiter for reading CSV data.
-                           Must be a single character. (default: ,)
-";
-
-#[derive(Clone, Deserialize)]
-struct Args {
-    arg_input: Option<String>,
-    flag_select: SelectColumns,
-    flag_limit: usize,
-    flag_asc: bool,
-    flag_no_nulls: bool,
-    flag_jobs: usize,
-    flag_output: Option<String>,
-    flag_no_headers: bool,
-    flag_delimiter: Option<Delimiter>,
+#[derive(Parser, Clone, Debug)]
+pub struct Args {
+#[arg()]
+    pub arg_input: Option<String>,
+#[arg(short = 's', long = "select", default_value = "")]
+    pub flag_select: SelectColumns,
+#[arg(long = "limit", value_name = "arg", default_value_t = 10)]
+    pub flag_limit: usize,
+#[arg(long = "asc")]
+    pub flag_asc: bool,
+#[arg(long = "no-nulls")]
+    pub flag_no_nulls: bool,
+#[arg(short = 'j', long = "jobs", value_name = "arg", default_value_t = 0)]
+    pub flag_jobs: usize,
+#[arg(short = 'o', long = "output", value_name = "file")]
+    pub flag_output: Option<String>,
+#[arg(short = 'n', long = "no-headers")]
+    pub flag_no_headers: bool,
+#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    pub flag_delimiter: Option<Delimiter>,
 }
 
-pub fn run(argv: &[&str]) -> CliResult<()> {
-    let args: Args = util::get_args(USAGE, argv)?;
+pub fn run(args: &Args) -> CliResult<()> {
     let rconfig = args.rconfig();
 
     let mut wtr = Config::new(&args.flag_output).writer()?;
@@ -149,18 +110,18 @@ impl Args {
         let nchunks = util::num_of_chunks(idx.count() as usize, chunk_size);
 
         let pool = ThreadPool::new(self.njobs());
-        let (send, recv) = channel::bounded(0);
+        let (send, recv) = crossbeam_channel::bounded(0);
         for i in 0..nchunks {
             let (send, args, sel) = (send.clone(), self.clone(), sel.clone());
             pool.execute(move || {
                 let mut idx = args.rconfig().indexed().unwrap().unwrap();
                 idx.seek((i * chunk_size) as u64).unwrap();
                 let it = idx.byte_records().take(chunk_size);
-                send.send(args.ftables(&sel, it).unwrap());
+                let _ = send.send(args.ftables(&sel, it).unwrap());
             });
         }
         drop(send);
-        Ok((headers, merge_all(recv).unwrap()))
+        Ok((headers, merge_all(recv.into_iter()).unwrap()))
     }
 
     fn ftables<I>(&self, sel: &Selection, it: I) -> CliResult<FTables>
@@ -193,7 +154,7 @@ impl Args {
     }
 
     fn njobs(&self) -> usize {
-        if self.flag_jobs == 0 { util::num_cpus() } else { self.flag_jobs }
+        if self.flag_jobs == 0 { num_cpus::get() } else { self.flag_jobs }
     }
 }
 

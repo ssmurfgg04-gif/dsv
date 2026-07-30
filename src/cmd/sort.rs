@@ -1,57 +1,38 @@
 use std::cmp;
 
-use CliResult;
-use config::{Config, Delimiter};
-use select::SelectColumns;
-use util;
+use crate::CliResult;
+use crate::config::{Config, Delimiter};
+use crate::select::SelectColumns;
 use std::str::from_utf8;
 
 use self::Number::{Float, Int};
+use clap::Parser;
 
-static USAGE: &'static str = "
-Sorts CSV data lexicographically.
-
-Note that this requires reading all of the CSV data into memory.
-
-Usage:
-    xsv sort [options] [<input>]
-
-sort options:
-    -s, --select <arg>     Select a subset of columns to sort.
-                           See 'xsv select --help' for the format details.
-    -N, --numeric          Compare according to string numerical value
-    -R, --reverse          Reverse order
-
-Common options:
-    -h, --help             Display this message
-    -o, --output <file>    Write output to <file> instead of stdout.
-    -n, --no-headers       When set, the first row will not be interpreted
-                           as headers. Namely, it will be sorted with the rest
-                           of the rows. Otherwise, the first row will always
-                           appear as the header row in the output.
-    -d, --delimiter <arg>  The field delimiter for reading CSV data.
-                           Must be a single character. (default: ,)
-";
-
-#[derive(Deserialize)]
-struct Args {
-    arg_input: Option<String>,
-    flag_select: SelectColumns,
-    flag_numeric: bool,
-    flag_reverse: bool,
-    flag_output: Option<String>,
-    flag_no_headers: bool,
-    flag_delimiter: Option<Delimiter>,
+#[derive(Parser, Debug)]
+pub struct Args {
+#[arg()]
+    pub arg_input: Option<String>,
+#[arg(short = 's', long = "select", default_value = "")]
+    pub flag_select: SelectColumns,
+#[arg(short = 'N', long = "numeric")]
+    pub flag_numeric: bool,
+    #[arg(short = 'r', long = "reverse")]
+    pub flag_reverse: bool,
+#[arg(short = 'o', long = "output", value_name = "file")]
+    pub flag_output: Option<String>,
+#[arg(short = 'n', long = "no-headers")]
+    pub flag_no_headers: bool,
+#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    pub flag_delimiter: Option<Delimiter>,
 }
 
-pub fn run(argv: &[&str]) -> CliResult<()> {
-    let args: Args = util::get_args(USAGE, argv)?;
+pub fn run(args: &Args) -> CliResult<()> {
     let numeric = args.flag_numeric;
     let reverse = args.flag_reverse;
     let rconfig = Config::new(&args.arg_input)
         .delimiter(args.flag_delimiter)
         .no_headers(args.flag_no_headers)
-        .select(args.flag_select);
+        .select(args.flag_select.clone());
 
     let mut rdr = rconfig.reader()?;
 

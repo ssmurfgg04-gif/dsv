@@ -2,45 +2,24 @@ use std::io;
 
 use tabwriter::TabWriter;
 
-use CliResult;
-use config::Delimiter;
-use util;
+use crate::CliResult;
+use crate::config::Delimiter;
+use crate::util;
+use clap::Parser;
 
-static USAGE: &'static str = "
-Prints the fields of the first row in the CSV data.
-
-These names can be used in commands like 'select' to refer to columns in the
-CSV data.
-
-Note that multiple CSV files may be given to this command. This is useful with
-the --intersect flag.
-
-Usage:
-    xsv headers [options] [<input>...]
-
-headers options:
-    -j, --just-names       Only show the header names (hide column index).
-                           This is automatically enabled if more than one
-                           input is given.
-    --intersect            Shows the intersection of all headers in all of
-                           the inputs given.
-
-Common options:
-    -h, --help             Display this message
-    -d, --delimiter <arg>  The field delimiter for reading CSV data.
-                           Must be a single character. (default: ,)
-";
-
-#[derive(Deserialize)]
-struct Args {
-    arg_input: Vec<String>,
-    flag_just_names: bool,
-    flag_intersect: bool,
-    flag_delimiter: Option<Delimiter>,
+#[derive(Parser, Debug)]
+pub struct Args {
+#[arg()]
+    pub arg_input: Vec<String>,
+#[arg(long = "just-names")]
+    pub flag_just_names: bool,
+#[arg(long = "intersect")]
+    pub flag_intersect: bool,
+#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    pub flag_delimiter: Option<Delimiter>,
 }
 
-pub fn run(argv: &[&str]) -> CliResult<()> {
-    let args: Args = util::get_args(USAGE, argv)?;
+pub fn run(args: &Args) -> CliResult<()> {
     let configs = util::many_configs(
         &*args.arg_input, args.flag_delimiter, true)?;
 
@@ -57,7 +36,7 @@ pub fn run(argv: &[&str]) -> CliResult<()> {
         }
     }
 
-    let mut wtr: Box<io::Write> =
+    let mut wtr: Box<dyn io::Write> =
         if args.flag_just_names {
             Box::new(io::stdout())
         } else {

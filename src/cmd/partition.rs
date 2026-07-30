@@ -7,55 +7,33 @@ use std::path::Path;
 use csv;
 use regex::Regex;
 
-use CliResult;
-use config::{Config, Delimiter};
-use select::SelectColumns;
-use util::{self, FilenameTemplate};
+use crate::CliResult;
+use crate::config::{Config, Delimiter};
+use crate::select::SelectColumns;
+use crate::util::FilenameTemplate;
+use clap::Parser;
 
-static USAGE: &'static str = "
-Partitions the given CSV data into chunks based on the value of a column
-
-The files are written to the output directory with filenames based on the
-values in the partition column and the `--filename` flag.
-
-Usage:
-    xsv partition [options] <column> <outdir> [<input>]
-    xsv partition --help
-
-partition options:
-    --filename <filename>  A filename template to use when constructing
-                           the names of the output files.  The string '{}'
-                           will be replaced by a value based on the value
-                           of the field, but sanitized for shell safety.
-                           [default: {}.csv]
-    -p, --prefix-length <n>  Truncate the partition column after the
-                           specified number of bytes when creating the
-                           output file.
-    --drop                 Drop the partition column from results.
-
-Common options:
-    -h, --help             Display this message
-    -n, --no-headers       When set, the first row will NOT be interpreted
-                           as column names. Otherwise, the first row will
-                           appear in all chunks as the header row.
-    -d, --delimiter <arg>  The field delimiter for reading CSV data.
-                           Must be a single character. (default: ,)
-";
-
-#[derive(Clone, Deserialize)]
-struct Args {
-    arg_column: SelectColumns,
-    arg_input: Option<String>,
-    arg_outdir: String,
-    flag_filename: FilenameTemplate,
-    flag_prefix_length: Option<usize>,
-    flag_drop: bool,
-    flag_no_headers: bool,
-    flag_delimiter: Option<Delimiter>,
+#[derive(Parser, Clone, Debug)]
+pub struct Args {
+#[arg()]
+    pub arg_column: SelectColumns,
+#[arg()]
+    pub arg_outdir: String,
+#[arg()]
+    pub arg_input: Option<String>,
+#[arg(long = "filename", value_name = "arg", default_value = "{}.csv")]
+    pub flag_filename: FilenameTemplate,
+    #[arg(long = "prefix-length", value_name = "arg")]
+    pub flag_prefix_length: Option<usize>,
+#[arg(long = "drop")]
+    pub flag_drop: bool,
+#[arg(short = 'n', long = "no-headers")]
+    pub flag_no_headers: bool,
+#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    pub flag_delimiter: Option<Delimiter>,
 }
 
-pub fn run(argv: &[&str]) -> CliResult<()> {
-    let args: Args = util::get_args(USAGE, argv)?;
+pub fn run(args: &Args) -> CliResult<()> {
     fs::create_dir_all(&args.arg_outdir)?;
 
     // It would be nice to support efficient parallel partitions, but doing
@@ -135,7 +113,7 @@ impl Args {
     }
 }
 
-type BoxedWriter = csv::Writer<Box<io::Write+'static>>;
+type BoxedWriter = csv::Writer<Box<dyn io::Write+'static>>;
 
 /// Generates unique filenames based on CSV values.
 struct WriterGenerator {

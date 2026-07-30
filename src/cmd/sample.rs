@@ -5,62 +5,34 @@ use csv;
 use rand::{self, Rng, SeedableRng};
 use rand::rngs::StdRng;
 
-use CliResult;
-use config::{Config, Delimiter};
-use index::Indexed;
-use util;
+use crate::CliResult;
+use crate::config::{Config, Delimiter};
+use crate::index::Indexed;
+use clap::Parser;
 
-static USAGE: &'static str = "
-Randomly samples CSV data uniformly using memory proportional to the size of
-the sample.
-
-When an index is present, this command will use random indexing if the sample
-size is less than 10% of the total number of records. This allows for efficient
-sampling such that the entire CSV file is not parsed.
-
-This command is intended to provide a means to sample from a CSV data set that
-is too big to fit into memory (for example, for use with commands like 'xsv
-frequency' or 'xsv stats'). It will however visit every CSV record exactly
-once, which is necessary to provide a uniform random sample. If you wish to
-limit the number of records visited, use the 'xsv slice' command to pipe into
-'xsv sample'.
-
-Usage:
-    xsv sample [options] <sample-size> [<input>]
-    xsv sample --help
-
-sample options:
-    --seed <number>        RNG seed.
-
-Common options:
-    -h, --help             Display this message
-    -o, --output <file>    Write output to <file> instead of stdout.
-    -n, --no-headers       When set, the first row will be consider as part of
-                           the population to sample from. (When not set, the
-                           first row is the header row and will always appear
-                           in the output.)
-    -d, --delimiter <arg>  The field delimiter for reading CSV data.
-                           Must be a single character. (default: ,)
-";
-
-#[derive(Deserialize)]
-struct Args {
-    arg_input: Option<String>,
-    arg_sample_size: u64,
-    flag_output: Option<String>,
-    flag_no_headers: bool,
-    flag_delimiter: Option<Delimiter>,
-    flag_seed: Option<usize>,
+#[derive(Parser, Debug)]
+pub struct Args {
+#[arg()]
+    pub arg_sample_size: u64,
+#[arg()]
+    pub arg_input: Option<String>,
+#[arg(short = 'o', long = "output", value_name = "file")]
+    pub flag_output: Option<String>,
+#[arg(short = 'n', long = "no-headers")]
+    pub flag_no_headers: bool,
+#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    pub flag_delimiter: Option<Delimiter>,
+#[arg(long = "seed", value_name = "arg")]
+    pub flag_seed: Option<usize>,
 }
 
-pub fn run(argv: &[&str]) -> CliResult<()> {
-    let args: Args = util::get_args(USAGE, argv)?;
+pub fn run(args: &Args) -> CliResult<()> {
     let rconfig = Config::new(&args.arg_input)
         .delimiter(args.flag_delimiter)
         .no_headers(args.flag_no_headers);
     let sample_size = args.arg_sample_size;
 
-    let mut wtr = Config::new(&args.flag_output).writer()?;
+    let mut wtr = Config::new(&args.flag_output.clone()).writer()?;
     let sampled = match rconfig.indexed()? {
         Some(mut idx) => {
             if do_random_access(sample_size, idx.count()) {
@@ -91,8 +63,9 @@ fn sample_random_access<R, I>(
 where R: io::Read + io::Seek, I: io::Read + io::Seek
 {
     let mut all_indices = (0..idx.count()).collect::<Vec<_>>();
+    use rand::seq::SliceRandom;
     let mut rng = ::rand::thread_rng();
-    rng.shuffle(&mut *all_indices);
+    all_indices.shuffle(&mut rng);
 
     let mut sampled = Vec::with_capacity(sample_size as usize);
     for i in all_indices.into_iter().take(sample_size as usize) {
@@ -129,7 +102,7 @@ fn sample_reservoir<R: io::Read>(
 
     // Now do the sampling.
     for (i, row) in records {
-        let random = rng.gen_range(0, i+1);
+        let random = rng.gen_range(0..i+1);
         if random < sample_size as usize {
             reservoir[random] = row?;
         }

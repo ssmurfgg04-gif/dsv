@@ -1,45 +1,26 @@
 use csv;
 
-use CliResult;
-use config::{Config, Delimiter};
-use util;
+use crate::CliResult;
+use crate::config::{Config, Delimiter};
+use clap::Parser;
 
-static USAGE: &'static str = "
-Read CSV data with special quoting rules.
-
-Generally, all xsv commands support basic options like specifying the delimiter
-used in CSV data. This does not cover all possible types of CSV data. For
-example, some CSV files don't use '\"' for quotes or use different escaping
-styles.
-
-Usage:
-    xsv input [options] [<input>]
-
-input options:
-    --quote <arg>          The quote character to use. [default: \"]
-    --escape <arg>         The escape character to use. When not specified,
-                           quotes are escaped by doubling them.
-    --no-quoting           Disable quoting completely.
-
-Common options:
-    -h, --help             Display this message
-    -o, --output <file>    Write output to <file> instead of stdout.
-    -d, --delimiter <arg>  The field delimiter for reading CSV data.
-                           Must be a single character. (default: ,)
-";
-
-#[derive(Deserialize)]
-struct Args {
-    arg_input: Option<String>,
-    flag_output: Option<String>,
-    flag_delimiter: Option<Delimiter>,
-    flag_quote: Delimiter,
-    flag_escape: Option<Delimiter>,
-    flag_no_quoting: bool,
+#[derive(Parser, Debug)]
+pub struct Args {
+#[arg()]
+    pub arg_input: Option<String>,
+#[arg(short = 'o', long = "output", value_name = "file")]
+    pub flag_output: Option<String>,
+#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    pub flag_delimiter: Option<Delimiter>,
+#[arg(long = "quote", value_name = "arg", default_value = "\"")]
+    pub flag_quote: Delimiter,
+#[arg(long = "escape", value_name = "arg")]
+    pub flag_escape: Option<Delimiter>,
+#[arg(long = "no-quoting")]
+    pub flag_no_quoting: bool,
 }
 
-pub fn run(argv: &[&str]) -> CliResult<()> {
-    let args: Args = util::get_args(USAGE, argv)?;
+pub fn run(args: &Args) -> CliResult<()> {
     let mut rconfig = Config::new(&args.arg_input)
         .delimiter(args.flag_delimiter)
         .no_headers(true)
