@@ -18,7 +18,7 @@ pub struct Args {
     pub arg_outdir: String,
 #[arg()]
     pub arg_input: Option<String>,
-#[arg(long = "size", value_name = "arg")]
+    #[arg(short = 's', long = "size", value_name = "arg")]
     pub flag_size: usize,
 #[arg(short = 'j', long = "jobs", value_name = "arg", default_value_t = 0)]
     pub flag_jobs: usize,

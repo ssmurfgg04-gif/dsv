@@ -23,6 +23,7 @@ impl Format {
         Format::Csv
     }
 
+    #[allow(dead_code)]
     pub fn from_output_path(path: &Option<String>) -> Format {
         match path { Some(p) => Format::from_path(p), None => Format::Csv }
     }
@@ -405,11 +406,10 @@ impl ParquetWriter {
 
     pub fn write_byte_record(&mut self, rec: &ByteRecord) -> CliResult<()> {
         self.records.push(rec.clone());
-        if self.records.len() >= 10000 { self.flush_batch()?; }
         Ok(())
     }
 
-    fn flush_batch(&mut self) -> CliResult<()> {
+    pub fn flush(&mut self) -> CliResult<()> {
         if self.records.is_empty() { return Ok(()); }
         let hdrs = match &self.schema_headers {
             Some(h) => h.clone(),
@@ -438,10 +438,7 @@ impl ParquetWriter {
         let schema = arrow::datatypes::Schema::new(fields);
         let batch = arrow::record_batch::RecordBatch::try_new(std::sync::Arc::new(schema.clone()), arrays)?;
         if let Some(path) = &self.output_path {
-            let exists = std::fs::metadata(path).is_ok();
-            let file = std::fs::File::options()
-                .append(exists).create(true).truncate(!exists)
-                .open(path)?;
+            let file = std::fs::File::create(path)?;
             let mut writer = parquet::arrow::ArrowWriter::try_new(file, std::sync::Arc::new(schema), None)?;
             writer.write(&batch)?;
             writer.close()?;
@@ -449,6 +446,4 @@ impl ParquetWriter {
         self.records.clear();
         Ok(())
     }
-
-    pub fn flush(&mut self) -> CliResult<()> { self.flush_batch() }
 }

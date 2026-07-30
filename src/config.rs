@@ -10,6 +10,7 @@ use csv;
 use crate::index::Indexed;
 
 use crate::CliResult;
+use crate::CliError;
 use crate::data::{DataReader, Format};
 use crate::select::Selection;
 use crate::util;
@@ -192,10 +193,102 @@ impl Config {
 
     pub fn reader(&self)
                  -> io::Result<csv::Reader<Box<dyn io::Read+'static>>> {
+        #[cfg(feature = "parquet")]
+        if let Some(ref p) = self.path {
+            let name = p.display().to_string().to_lowercase();
+            if name.ends_with(".parquet") || name.ends_with(".par") {
+                return self.parquet_csv_reader();
+            }
+        }
+        #[cfg(feature = "jsonl")]
+        if let Some(ref p) = self.path {
+            let name = p.display().to_string().to_lowercase();
+            if name.ends_with(".jsonl") || name.ends_with(".ndjson") || name.ends_with(".json") {
+                return self.jsonl_csv_reader();
+            }
+        }
         Ok(self.from_reader(self.io_reader()?))
     }
 
+    #[cfg(feature = "parquet")]
+    fn parquet_csv_reader(&self) -> io::Result<csv::Reader<Box<dyn io::Read+'static>>> {
+        use crate::data::ParquetReader;
+        let path = self.path.as_ref().unwrap().display().to_string();
+        let mut pr = ParquetReader::from_file(&path)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Parquet: {e}")))?;
+        let headers = pr.headers()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Parquet: {e}")))?;
+        let mut buf: Vec<u8> = Vec::new();
+        {
+            let mut wtr = csv::WriterBuilder::new()
+                .delimiter(self.delimiter)
+                .has_headers(false)
+                .from_writer(&mut buf);
+            wtr.write_byte_record(&headers)
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("CSV: {e}")))?;
+            let mut rec = csv::ByteRecord::new();
+            while pr.read_byte_record(&mut rec)
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Parquet: {e}")))? {
+                wtr.write_byte_record(&rec)
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("CSV: {e}")))?;
+            }
+            wtr.flush().ok();
+        }
+        Ok(csv::ReaderBuilder::new()
+            .flexible(self.flexible)
+            .delimiter(self.delimiter)
+            .has_headers(!self.no_headers)
+            .quote(self.quote)
+            .quoting(self.quoting)
+            .escape(self.escape)
+            .from_reader(Box::new(io::Cursor::new(buf)) as Box<dyn io::Read>))
+    }
+
+    #[cfg(feature = "jsonl")]
+    fn jsonl_csv_reader(&self) -> io::Result<csv::Reader<Box<dyn io::Read+'static>>> {
+        use crate::data::JsonlReader;
+        let file = self.io_reader()?;
+        let mut jr = JsonlReader::new(file, self.no_headers)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("JSONL: {e}")))?;
+        let headers = jr.headers()
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("JSONL: {e}")))?;
+        let mut buf: Vec<u8> = Vec::new();
+        {
+            let mut wtr = csv::WriterBuilder::new()
+                .delimiter(self.delimiter)
+                .has_headers(false)
+                .from_writer(&mut buf);
+            if !self.no_headers {
+                wtr.write_byte_record(&headers)
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("CSV: {e}")))?;
+            }
+            let mut rec = csv::ByteRecord::new();
+            while jr.read_byte_record(&mut rec)
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("JSONL: {e}")))? {
+                wtr.write_byte_record(&rec)
+                    .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("CSV: {e}")))?;
+            }
+            wtr.flush().ok();
+        }
+        Ok(csv::ReaderBuilder::new()
+            .flexible(self.flexible)
+            .delimiter(self.delimiter)
+            .has_headers(!self.no_headers)
+            .quote(self.quote)
+            .quoting(self.quoting)
+            .escape(self.escape)
+            .from_reader(Box::new(io::Cursor::new(buf)) as Box<dyn io::Read>))
+    }
+
     pub fn data_reader(&self, fmt: Format) -> CliResult<DataReader> {
+        #[cfg(feature = "parquet")]
+        if fmt == Format::Parquet {
+            let path = match &self.path {
+                Some(p) => p.display().to_string(),
+                None => return Err(CliError::Other("Parquet requires a file path".into())),
+            };
+            return DataReader::from_path(&path, fmt, Some(self.delimiter), self.no_headers);
+        }
         let file: Box<dyn io::Read> = self.io_reader()?;
         let delim = Some(self.delimiter);
         DataReader::from_reader(file, fmt, delim, self.no_headers)
