@@ -1,6 +1,6 @@
 [package]
 name = "dsv"
-version = "0.13.0"
+version = "0.13.1"
 authors = ["dsv contributors", "Andrew Gallant <jamslam@gmail.com>"]
 description = "dsv (Data Swiss Knife) — a high-performance CSV, Parquet, and JSONL CLI toolkit. Modern xsv fork with all 33 community PRs merged."
 homepage = "https://github.com/ssmurfgg04-gif/dsv"
