@@ -8,10 +8,7 @@ use std::time;
 
 use std::str::FromStr;
 
-use csv;
-
 use crate::config::{Config, Delimiter};
-
 
 #[allow(dead_code)]
 pub fn version() -> String {
@@ -21,24 +18,29 @@ pub fn version() -> String {
         option_env!("CARGO_PKG_VERSION_PATCH"),
     );
     match (maj, min, pat) {
-        (Some(maj), Some(min), Some(pat)) =>
-            format!("{}.{}.{}", maj, min, pat),
+        (Some(maj), Some(min), Some(pat)) => format!("{}.{}.{}", maj, min, pat),
         _ => "".to_owned(),
     }
 }
 
-pub fn many_configs(inps: &[String], delim: Option<Delimiter>,
-                    no_headers: bool) -> Result<Vec<Config>, String> {
+pub fn many_configs(
+    inps: &[String],
+    delim: Option<Delimiter>,
+    no_headers: bool,
+) -> Result<Vec<Config>, String> {
     let mut inps = inps.to_vec();
     if inps.is_empty() {
         inps.push("-".to_owned()); // stdin
     }
-    let confs = inps.into_iter()
-                    .map(|p| Config::new(&Some(p))
-                                    .delimiter(delim)
-                                    .no_headers(no_headers))
-                    .collect::<Vec<_>>();
-    errif_greater_one_stdin(&*confs)?;
+    let confs = inps
+        .into_iter()
+        .map(|p| {
+            Config::new(&Some(p))
+                .delimiter(delim)
+                .no_headers(no_headers)
+        })
+        .collect::<Vec<_>>();
+    errif_greater_one_stdin(&confs)?;
     Ok(confs)
 }
 
@@ -79,7 +81,7 @@ pub fn condense<'a>(val: Cow<'a, [u8]>, n: Option<usize>) -> Cow<'a, [u8]> {
         None => val,
         Some(n) => {
             let mut is_short_utf8 = false;
-            if let Ok(s) = str::from_utf8(&*val) {
+            if let Ok(s) = str::from_utf8(&val) {
                 if n >= s.chars().count() {
                     is_short_utf8 = true;
                 } else {
@@ -88,7 +90,8 @@ pub fn condense<'a>(val: Cow<'a, [u8]>, n: Option<usize>) -> Cow<'a, [u8]> {
                     return Cow::Owned(s.into_bytes());
                 }
             }
-            if is_short_utf8 || n >= (*val).len() { // already short enough
+            if is_short_utf8 || n >= (*val).len() {
+                // already short enough
                 val
             } else {
                 // This is a non-Unicode string, so we just trim on bytes.
@@ -101,27 +104,33 @@ pub fn condense<'a>(val: Cow<'a, [u8]>, n: Option<usize>) -> Cow<'a, [u8]> {
 }
 
 pub fn idx_path(csv_path: &Path) -> PathBuf {
-    let mut p = csv_path.to_path_buf().into_os_string().into_string().unwrap();
+    let mut p = csv_path
+        .to_path_buf()
+        .into_os_string()
+        .into_string()
+        .unwrap();
     p.push_str(".idx");
     PathBuf::from(&p)
 }
 
 pub type Idx = Option<usize>;
 
-pub fn range(start: Idx, end: Idx, len: Idx, index: Idx)
-            -> Result<(usize, usize), String> {
+pub fn range(start: Idx, end: Idx, len: Idx, index: Idx) -> Result<(usize, usize), String> {
     match (start, end, len, index) {
-        (None, None, None, Some(i)) => Ok((i, i+1)),
-        (_, _, _, Some(_)) =>
-            Err("--index cannot be used with --start, --end or --len".to_owned()),
-        (_, Some(_), Some(_), None) =>
-            Err("--end and --len cannot be used at the same time.".to_owned()),
-        (_, None, None, None) => Ok((start.unwrap_or(0), ::std::usize::MAX)),
+        (None, None, None, Some(i)) => Ok((i, i + 1)),
+        (_, _, _, Some(_)) => Err("--index cannot be used with --start, --end or --len".to_owned()),
+        (_, Some(_), Some(_), None) => {
+            Err("--end and --len cannot be used at the same time.".to_owned())
+        }
+        (_, None, None, None) => Ok((start.unwrap_or(0), usize::MAX)),
         (_, Some(e), None, None) => {
             let s = start.unwrap_or(0);
             if s > e {
-                Err(format!("The end of the range ({}) must be greater than or\n\
-                             equal to the start of the range ({}).", e, s))
+                Err(format!(
+                    "The end of the range ({}) must be greater than or\n\
+                             equal to the start of the range ({}).",
+                    e, s
+                ))
             } else {
                 Ok((s, e))
             }
@@ -142,7 +151,7 @@ fn create_dir_all_threadsafe(path: &Path) -> io::Result<()> {
         match fs::create_dir_all(path) {
             // This happens if a directory in `path` doesn't exist when we
             // test for it, and another thread creates it before we can.
-            Err(ref err) if err.kind() == io::ErrorKind::AlreadyExists => {},
+            Err(ref err) if err.kind() == io::ErrorKind::AlreadyExists => {}
             other => return other,
         }
         // We probably don't need to sleep at all, because the intermediate
@@ -166,16 +175,20 @@ impl FilenameTemplate {
     /// Generate a new filename using `unique_value` to replace the `"{}"`
     /// in the template.
     pub fn filename(&self, unique_value: &str) -> String {
-        format!("{}{}{}", &self.prefix, unique_value, &self.suffix)
+        format!("{}{}{}", self.prefix, unique_value, self.suffix)
     }
 
     /// Create a new, writable file in directory `path` with a filename
     /// using `unique_value` to replace the `"{}"` in the template.  Note
     /// that we do not output headers; the caller must do that if
     /// desired.
-    pub fn writer<P>(&self, path: P, unique_value: &str)
-                 -> io::Result<csv::Writer<Box<dyn io::Write+'static>>>
-        where P: AsRef<Path>
+    pub fn writer<P>(
+        &self,
+        path: P,
+        unique_value: &str,
+    ) -> io::Result<csv::Writer<Box<dyn io::Write + 'static>>>
+    where
+        P: AsRef<Path>,
     {
         let filename = self.filename(unique_value);
         let full_path = path.as_ref().join(filename);

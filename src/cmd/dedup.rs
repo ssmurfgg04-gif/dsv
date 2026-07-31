@@ -1,9 +1,9 @@
-use std::collections::HashSet;
-use csv::ByteRecord;
-use crate::CliResult;
 use crate::config::{Config, Delimiter};
 use crate::select::SelectColumns;
+use crate::CliResult;
 use clap::Parser;
+use csv::ByteRecord;
+use std::collections::HashSet;
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -30,13 +30,17 @@ pub fn run(args: &Args) -> CliResult<()> {
     let headers = rdr.byte_headers()?.clone();
     let sel = rconfig.selection(&headers)?;
 
-    if !rconfig.no_headers { wtr.write_record(&headers)?; }
+    if !rconfig.no_headers {
+        wtr.write_record(&headers)?;
+    }
 
     let mut seen: HashSet<Vec<Vec<u8>>> = HashSet::new();
     let mut rec = ByteRecord::new();
     while rdr.read_byte_record(&mut rec)? {
         let key: Vec<Vec<u8>> = sel.select(&rec).map(|f| f.to_vec()).collect();
-        if seen.insert(key) { wtr.write_byte_record(&rec)?; }
+        if seen.insert(key) {
+            wtr.write_byte_record(&rec)?;
+        }
     }
     wtr.flush()?;
     Ok(())

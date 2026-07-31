@@ -18,12 +18,14 @@ macro_rules! werr {
 }
 
 macro_rules! fail {
-    ($e:expr) => (Err(::std::convert::From::from($e)));
+    ($e:expr) => {
+        Err(::std::convert::From::from($e))
+    };
 }
 
 macro_rules! command_list {
-    () => (
-"    cat         Concatenate by row or column
+    () => {
+        "    cat         Concatenate by row or column
     convert     Convert between CSV/TSV/Parquet/JSONL
     count       Count records
     dedup       Deduplicate rows
@@ -51,7 +53,7 @@ macro_rules! command_list {
     table       Align CSV data into columns
     transpose   Transpose rows and columns
 "
-    )
+    };
 }
 
 mod cmd;
@@ -142,30 +144,29 @@ fn main() {
             werr!(concat!(
                 "dsv is a suite of CSV/Parquet/JSONL command line utilities.\n\
 \n\
-Please choose one of the following commands:", command_list!()));
+Please choose one of the following commands:",
+                command_list!()
+            ));
             process::exit(0);
         }
-        Some(cmd) => {
-            match cmd.run() {
-                Ok(()) => process::exit(0),
-                Err(CliError::Csv(err)) => {
-                    werr!("{}", err);
-                    process::exit(1);
-                }
-                Err(CliError::Io(ref err))
-                        if err.kind() == io::ErrorKind::BrokenPipe => {
-                    process::exit(0);
-                }
-                Err(CliError::Io(err)) => {
-                    werr!("{}", err);
-                    process::exit(1);
-                }
-                Err(CliError::Other(msg)) => {
-                    werr!("{}", msg);
-                    process::exit(1);
-                }
+        Some(cmd) => match cmd.run() {
+            Ok(()) => process::exit(0),
+            Err(CliError::Csv(err)) => {
+                werr!("{}", err);
+                process::exit(1);
             }
-        }
+            Err(CliError::Io(ref err)) if err.kind() == io::ErrorKind::BrokenPipe => {
+                process::exit(0);
+            }
+            Err(CliError::Io(err)) => {
+                werr!("{}", err);
+                process::exit(1);
+            }
+            Err(CliError::Other(msg)) => {
+                werr!("{}", msg);
+                process::exit(1);
+            }
+        },
     }
 }
 
@@ -214,9 +215,9 @@ pub enum CliError {
 impl std::fmt::Display for CliError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            CliError::Csv(ref e) => { e.fmt(f) }
-            CliError::Io(ref e) => { e.fmt(f) }
-            CliError::Other(ref s) => { f.write_str(s) }
+            CliError::Csv(ref e) => e.fmt(f),
+            CliError::Io(ref e) => e.fmt(f),
+            CliError::Other(ref s) => f.write_str(s),
         }
     }
 }

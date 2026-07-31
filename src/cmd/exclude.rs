@@ -1,8 +1,8 @@
-use regex::bytes::RegexBuilder;
-use crate::CliResult;
 use crate::config::{Config, Delimiter};
 use crate::select::SelectColumns;
+use crate::CliResult;
 use clap::Parser;
+use regex::bytes::RegexBuilder;
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -23,7 +23,7 @@ pub struct Args {
 }
 
 pub fn run(args: &Args) -> CliResult<()> {
-    let pattern = RegexBuilder::new(&*args.arg_regex)
+    let pattern = RegexBuilder::new(&args.arg_regex)
         .case_insensitive(args.flag_ignore_case)
         .build()?;
     let rconfig = Config::new(&args.arg_input)
@@ -36,11 +36,15 @@ pub fn run(args: &Args) -> CliResult<()> {
     let headers = rdr.byte_headers()?.clone();
     let sel = rconfig.selection(&headers)?;
 
-    if !rconfig.no_headers { wtr.write_record(&headers)?; }
+    if !rconfig.no_headers {
+        wtr.write_record(&headers)?;
+    }
     let mut record = csv::ByteRecord::new();
     while rdr.read_byte_record(&mut record)? {
         let matched = sel.select(&record).any(|f| pattern.is_match(f));
-        if !matched { wtr.write_byte_record(&record)?; }
+        if !matched {
+            wtr.write_byte_record(&record)?;
+        }
     }
     Ok(wtr.flush()?)
 }

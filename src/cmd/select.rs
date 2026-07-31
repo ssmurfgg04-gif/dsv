@@ -1,26 +1,25 @@
 use csv;
 
-use crate::CliResult;
 use crate::config::{Config, Delimiter};
 use crate::select::SelectColumns;
+use crate::CliResult;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
 pub struct Args {
-#[arg()]
+    #[arg()]
     pub arg_selection: SelectColumns,
-#[arg()]
+    #[arg()]
     pub arg_input: Option<String>,
-#[arg(short = 'o', long = "output", value_name = "file")]
+    #[arg(short = 'o', long = "output", value_name = "file")]
     pub flag_output: Option<String>,
-#[arg(short = 'n', long = "no-headers")]
+    #[arg(short = 'n', long = "no-headers")]
     pub flag_no_headers: bool,
-#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    #[arg(short = 'd', long = "delimiter", value_name = "arg")]
     pub flag_delimiter: Option<Delimiter>,
 }
 
 pub fn run(args: &Args) -> CliResult<()> {
-
     let rconfig = Config::new(&args.arg_input)
         .delimiter(args.flag_delimiter)
         .no_headers(args.flag_no_headers)

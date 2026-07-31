@@ -1,33 +1,32 @@
 use csv;
 
-use crate::CliResult;
 use crate::config::{Config, Delimiter};
+use crate::CliResult;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
 pub struct Args {
-#[arg()]
+    #[arg()]
     pub arg_input: Option<String>,
-#[arg(short = 't', long = "out-delimiter", value_name = "arg")]
+    #[arg(short = 't', long = "out-delimiter", value_name = "arg")]
     pub flag_out_delimiter: Option<Delimiter>,
-#[arg(long = "crlf")]
+    #[arg(long = "crlf")]
     pub flag_crlf: bool,
-#[arg(long = "ascii")]
+    #[arg(long = "ascii")]
     pub flag_ascii: bool,
-#[arg(short = 'o', long = "output", value_name = "file")]
+    #[arg(short = 'o', long = "output", value_name = "file")]
     pub flag_output: Option<String>,
-#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    #[arg(short = 'd', long = "delimiter", value_name = "arg")]
     pub flag_delimiter: Option<Delimiter>,
-#[arg(long = "quote", value_name = "arg", default_value = "\"")]
+    #[arg(long = "quote", value_name = "arg", default_value = "\"")]
     pub flag_quote: Delimiter,
-#[arg(long = "quote-always")]
+    #[arg(long = "quote-always")]
     pub flag_quote_always: bool,
-#[arg(long = "escape", value_name = "arg")]
+    #[arg(long = "escape", value_name = "arg")]
     pub flag_escape: Option<Delimiter>,
 }
 
 pub fn run(args: &Args) -> CliResult<()> {
-
     let rconfig = Config::new(&args.arg_input)
         .delimiter(args.flag_delimiter)
         .no_headers(true);
@@ -47,7 +46,6 @@ pub fn run(args: &Args) -> CliResult<()> {
         wconfig = wconfig.escape(Some(escape.as_byte())).double_quote(false);
     }
     wconfig = wconfig.quote(args.flag_quote.as_byte());
-
 
     let mut rdr = rconfig.reader()?;
     let mut wtr = wconfig.writer()?;

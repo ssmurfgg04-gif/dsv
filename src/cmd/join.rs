@@ -1,48 +1,47 @@
-use std::collections::hash_map::{HashMap, Entry};
+use std::collections::hash_map::{Entry, HashMap};
 use std::fmt;
 use std::fs;
 use std::io;
-use std::iter::repeat;
 use std::str;
 
-use byteorder::{WriteBytesExt, BigEndian};
+use byteorder::{BigEndian, WriteBytesExt};
 use csv;
 
-use crate::CliResult;
 use crate::config::{Config, Delimiter};
 use crate::index::Indexed;
 use crate::select::{SelectColumns, Selection};
+use crate::CliResult;
 use clap::Parser;
 
 type ByteString = Vec<u8>;
 
 #[derive(Parser, Debug)]
 pub struct Args {
-#[arg()]
+    #[arg()]
     pub arg_columns1: SelectColumns,
-#[arg()]
+    #[arg()]
     pub arg_input1: String,
-#[arg()]
+    #[arg()]
     pub arg_columns2: SelectColumns,
-#[arg()]
+    #[arg()]
     pub arg_input2: String,
-#[arg(long = "left")]
+    #[arg(long = "left")]
     pub flag_left: bool,
-#[arg(long = "right")]
+    #[arg(long = "right")]
     pub flag_right: bool,
-#[arg(long = "full")]
+    #[arg(long = "full")]
     pub flag_full: bool,
-#[arg(long = "cross")]
+    #[arg(long = "cross")]
     pub flag_cross: bool,
-#[arg(short = 'o', long = "output", value_name = "file")]
+    #[arg(short = 'o', long = "output", value_name = "file")]
     pub flag_output: Option<String>,
-#[arg(short = 'n', long = "no-headers")]
+    #[arg(short = 'n', long = "no-headers")]
     pub flag_no_headers: bool,
-#[arg(long = "no-case")]
+    #[arg(long = "no-case")]
     pub flag_no_case: bool,
-#[arg(long = "nulls")]
+    #[arg(long = "nulls")]
     pub flag_nulls: bool,
-#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    #[arg(short = 'd', long = "delimiter", value_name = "arg")]
     pub flag_delimiter: Option<Delimiter>,
 }
 
@@ -74,7 +73,7 @@ pub fn run(args: &Args) -> CliResult<()> {
             state.write_headers()?;
             state.inner_join()
         }
-        _ => fail!("Please pick exactly one join operation.")
+        _ => fail!("Please pick exactly one join operation."),
     }
 }
 
@@ -101,8 +100,7 @@ impl<R: io::Read + io::Seek, W: io::Write> IoState<R, W> {
 
     fn inner_join(mut self) -> CliResult<()> {
         let mut scratch = csv::ByteRecord::new();
-        let mut validx = ValueIndex::new(
-            self.rdr2, &self.sel2, self.casei, self.nulls)?;
+        let mut validx = ValueIndex::new(self.rdr2, &self.sel2, self.casei, self.nulls)?;
         for row in self.rdr1.byte_records() {
             let row = row?;
             let key = get_row_key(&self.sel1, &row, self.casei);
@@ -130,8 +128,7 @@ impl<R: io::Read + io::Seek, W: io::Write> IoState<R, W> {
 
         let mut scratch = csv::ByteRecord::new();
         let (_, pad2) = self.get_padding()?;
-        let mut validx = ValueIndex::new(
-            self.rdr2, &self.sel2, self.casei, self.nulls)?;
+        let mut validx = ValueIndex::new(self.rdr2, &self.sel2, self.casei, self.nulls)?;
         for row in self.rdr1.byte_records() {
             let row = row?;
             let key = get_row_key(&self.sel1, &row, self.casei);
@@ -163,12 +160,10 @@ impl<R: io::Read + io::Seek, W: io::Write> IoState<R, W> {
     fn full_outer_join(mut self) -> CliResult<()> {
         let mut scratch = csv::ByteRecord::new();
         let (pad1, pad2) = self.get_padding()?;
-        let mut validx = ValueIndex::new(
-            self.rdr2, &self.sel2, self.casei, self.nulls)?;
+        let mut validx = ValueIndex::new(self.rdr2, &self.sel2, self.casei, self.nulls)?;
 
         // Keep track of which rows we've written from rdr2.
-        let mut rdr2_written: Vec<_> =
-            repeat(false).take(validx.num_rows).collect();
+        let mut rdr2_written: Vec<_> = std::iter::repeat_n(false, validx.num_rows).collect();
         for row1 in self.rdr1.byte_records() {
             let row1 = row1?;
             let key = get_row_key(&self.sel1, &row1, self.casei);
@@ -219,21 +214,18 @@ impl<R: io::Read + io::Seek, W: io::Write> IoState<R, W> {
         Ok(())
     }
 
-    fn get_padding(
-        &mut self,
-    ) -> CliResult<(csv::ByteRecord, csv::ByteRecord)> {
+    fn get_padding(&mut self) -> CliResult<(csv::ByteRecord, csv::ByteRecord)> {
         let len1 = self.rdr1.byte_headers()?.len();
         let len2 = self.rdr2.byte_headers()?.len();
         Ok((
-            repeat(b"").take(len1).collect(),
-            repeat(b"").take(len2).collect(),
+            std::iter::repeat_n(b"", len1).collect(),
+            std::iter::repeat_n(b"", len2).collect(),
         ))
     }
 }
 
 impl Args {
-    fn new_io_state(&self)
-        -> CliResult<IoState<fs::File, Box<dyn io::Write+'static>>> {
+    fn new_io_state(&self) -> CliResult<IoState<fs::File, Box<dyn io::Write + 'static>>> {
         let rconf1 = Config::new(&Some(self.arg_input1.clone()))
             .delimiter(self.flag_delimiter)
             .no_headers(self.flag_no_headers)
@@ -245,14 +237,13 @@ impl Args {
 
         let mut rdr1 = rconf1.reader_file()?;
         let mut rdr2 = rconf2.reader_file()?;
-        let (sel1, sel2) = self.get_selections(
-            &rconf1, &mut rdr1, &rconf2, &mut rdr2)?;
+        let (sel1, sel2) = self.get_selections(&rconf1, &mut rdr1, &rconf2, &mut rdr2)?;
         Ok(IoState {
             wtr: Config::new(&self.flag_output).writer()?,
-            rdr1: rdr1,
-            sel1: sel1,
-            rdr2: rdr2,
-            sel2: sel2,
+            rdr1,
+            sel1,
+            rdr2,
+            sel2,
             no_headers: rconf1.no_headers,
             casei: self.flag_no_case,
             nulls: self.flag_nulls,
@@ -261,18 +252,22 @@ impl Args {
 
     fn get_selections<R: io::Read>(
         &self,
-        rconf1: &Config, rdr1: &mut csv::Reader<R>,
-        rconf2: &Config, rdr2: &mut csv::Reader<R>,
+        rconf1: &Config,
+        rdr1: &mut csv::Reader<R>,
+        rconf2: &Config,
+        rdr2: &mut csv::Reader<R>,
     ) -> CliResult<(Selection, Selection)> {
         let headers1 = rdr1.byte_headers()?;
         let headers2 = rdr2.byte_headers()?;
-        let select1 = rconf1.selection(&*headers1)?;
-        let select2 = rconf2.selection(&*headers2)?;
+        let select1 = rconf1.selection(headers1)?;
+        let select2 = rconf2.selection(headers2)?;
         if select1.len() != select2.len() {
             return fail!(format!(
                 "Column selections must have the same number of columns, \
                  but found column selections with {} and {} columns.",
-                select1.len(), select2.len()));
+                select1.len(),
+                select2.len()
+            ));
         }
         Ok((select1, select2))
     }
@@ -320,10 +315,7 @@ impl<R: io::Read + io::Seek> ValueIndex<R> {
             // indexes in one pass.
             row_idx.write_u64::<BigEndian>(row.position().unwrap().byte())?;
 
-            let fields: Vec<_> = sel
-                .select(&row)
-                .map(|v| transform(v, casei))
-                .collect();
+            let fields: Vec<_> = sel.select(&row).map(|v| transform(v, casei)).collect();
             if nulls || !fields.iter().any(|f| f.is_empty()) {
                 match val_idx.entry(fields) {
                     Entry::Vacant(v) => {
@@ -344,7 +336,7 @@ impl<R: io::Read + io::Seek> ValueIndex<R> {
         let idx = Indexed::open(rdr, io::Cursor::new(row_idx.into_inner()))?;
         Ok(ValueIndex {
             values: val_idx,
-            idx: idx,
+            idx,
             num_rows: rowi,
         })
     }
@@ -357,21 +349,18 @@ impl<R> fmt::Debug for ValueIndex<R> {
         kvs.sort_by(|&(_, v1), &(_, v2)| v1[0].cmp(&v2[0]));
         for (keys, rows) in kvs.into_iter() {
             // This is just for debugging, so assume Unicode for now.
-            let keys = keys.iter()
-                           .map(|k| String::from_utf8(k.to_vec()).unwrap())
-                           .collect::<Vec<_>>();
+            let keys = keys
+                .iter()
+                .map(|k| String::from_utf8(k.to_vec()).unwrap())
+                .collect::<Vec<_>>();
             writeln!(f, "({}) => {:?}", keys.join(", "), rows)?
         }
         Ok(())
     }
 }
 
-fn get_row_key(
-    sel: &Selection,
-    row: &csv::ByteRecord,
-    casei: bool,
-) -> Vec<ByteString> {
-    sel.select(row).map(|v| transform(&v, casei)).collect()
+fn get_row_key(sel: &Selection, row: &csv::ByteRecord, casei: bool) -> Vec<ByteString> {
+    sel.select(row).map(|v| transform(v, casei)).collect()
 }
 
 fn transform(bs: &[u8], casei: bool) -> ByteString {
@@ -381,9 +370,11 @@ fn transform(bs: &[u8], casei: bool) -> ByteString {
             if !casei {
                 s.trim().as_bytes().to_vec()
             } else {
-                let norm: String =
-                    s.trim().chars()
-                     .map(|c| c.to_lowercase().next().unwrap()).collect();
+                let norm: String = s
+                    .trim()
+                    .chars()
+                    .map(|c| c.to_lowercase().next().unwrap())
+                    .collect();
                 norm.into_bytes()
             }
         }

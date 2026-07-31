@@ -1,43 +1,39 @@
 These are some very basic and unscientific benchmarks of various commands
-provided by `xsv`. Please see below for more information.
+provided by `dsv`. Please see below for more information.
 
-These benchmarks were run with
-[worldcitiespop_mil.csv](https://burntsushi.net/stuff/worldcitiespop_mil.csv),
-which is a random 1,000,000 row subset of the world city population dataset
-from the [Data Science Toolkit](https://github.com/petewarden/dstkdata).
+The dataset is a synthetic 1,000,000-row CSV (23.78 MB) with 3 columns
+(`country`, `city`, `population`), generated for benchmarking. Results were
+measured with `dsv 0.13.0` compiled in `--release` mode (thin LTO, stripped).
 
-These benchmarks were run on an Intel i7-6900K (8 CPUs, 16 threads) with 64GB
-of memory.
+Benchmarks were run on an Intel i5-4210M (2 cores, 4 threads) with 16GB of
+RAM, a mechanical HDD, and the input file cached in page cache.
 
 ```
-count                   0.11 seconds   413.76  MB/sec
-flatten                 4.54 seconds   10.02   MB/sec
-flatten_condensed       4.45 seconds   10.22   MB/sec
-frequency               1.82 seconds   25.00   MB/sec
-index                   0.12 seconds   379.28  MB/sec
-sample_10               0.18 seconds   252.85  MB/sec
-sample_1000             0.18 seconds   252.85  MB/sec
-sample_100000           0.29 seconds   156.94  MB/sec
-search                  0.27 seconds   168.56  MB/sec
-select                  0.14 seconds   325.09  MB/sec
-search                  0.13 seconds   350.10  MB/sec
-select                  0.13 seconds   350.10  MB/sec
-sort                    2.18 seconds   20.87   MB/sec
-slice_one_middle        0.08 seconds   568.92  MB/sec
-slice_one_middle_index  0.01 seconds   4551.36 MB/sec
-stats                   1.09 seconds   41.75   MB/sec
-stats_index             0.15 seconds   303.42  MB/sec
-stats_everything        1.94 seconds   23.46   MB/sec
-stats_everything_index  0.93 seconds   48.93   MB/sec
+count                   0.072  secs   330.3  MB/sec
+search                  0.139  secs   171.1  MB/sec
+select                  0.193  secs   123.2  MB/sec
+transpose               0.453  secs    52.5  MB/sec
+stats --median          0.807  secs    29.5  MB/sec
+convert -> parquet      1.988  secs    12.0  MB/sec
+dedup                   2.055  secs    11.6  MB/sec
+frequency               4.645  secs     5.1  MB/sec
+sort                    4.956  secs     4.8  MB/sec
+convert -> jsonl        8.687  secs     2.7  MB/sec
 ```
 
-### Details
+Parquet round-trip: `convert bench.csv bench.parquet` produces a 26.5 MB
+file; converting it back to CSV yields identical rows (verified with
+`cmp` after normalizing line endings).
 
-The purpose of these benchmarks is to provide a rough ballpark estimate of how
-fast each command is. My hope is that they can also catch significant
-performance regressions.
+### Notes
 
-The `count` command can be viewed as a sort of baseline of the fastest possible
-command that parses every record in CSV data.
-
-The benchmarks that end with `_index` are run with indexing enabled.
+- `count`, `select`, and `search` are the streaming baselines: near-linear
+  scans with constant memory. `count` is the fastest possible command that
+  parses every record.
+- `sort`, `dedup`, and `frequency` must hold state (or spill) and are
+  therefore slower per byte; this matches xsv's original behavior.
+- `convert` to Parquet benefits from Arrow's columnar encoding; JSONL output
+  is write-bound (one JSON object per line).
+- These are ballpark figures for catching regressions, not a controlled
+  benchmark. For xsv-era comparisons, see the upstream
+  [xsv benchmark](https://github.com/BurntSushi/xsv/blob/master/BENCHMARKS.md).

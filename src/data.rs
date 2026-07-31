@@ -1,13 +1,20 @@
-use std::io::{Read, Write, BufRead, BufReader};
-use std::path::Path;
 use csv::ByteRecord;
+use std::io::{Read, Write};
+use std::path::Path;
 
-use crate::CliResult;
+#[cfg(feature = "jsonl")]
+use std::io::{BufRead, BufReader};
+
+#[cfg(any(feature = "jsonl", feature = "parquet"))]
 use crate::CliError;
+use crate::CliResult;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Format {
-    Csv, Tsv, Jsonl,
+    Csv,
+    Tsv,
+    #[cfg(feature = "jsonl")]
+    Jsonl,
     #[cfg(feature = "parquet")]
     Parquet,
 }
@@ -15,17 +22,18 @@ pub enum Format {
 impl Format {
     pub fn from_path<P: AsRef<Path>>(path: P) -> Format {
         let p = path.as_ref().display().to_string().to_lowercase();
-        if p.ends_with(".tsv") || p.ends_with(".tab") { return Format::Tsv; }
+        if p.ends_with(".tsv") || p.ends_with(".tab") {
+            return Format::Tsv;
+        }
         #[cfg(feature = "parquet")]
-        if p.ends_with(".parquet") || p.ends_with(".par") { return Format::Parquet; }
+        if p.ends_with(".parquet") || p.ends_with(".par") {
+            return Format::Parquet;
+        }
         #[cfg(feature = "jsonl")]
-        if p.ends_with(".jsonl") || p.ends_with(".json") || p.ends_with(".ndjson") { return Format::Jsonl; }
+        if p.ends_with(".jsonl") || p.ends_with(".ndjson") {
+            return Format::Jsonl;
+        }
         Format::Csv
-    }
-
-    #[allow(dead_code)]
-    pub fn from_output_path(path: &Option<String>) -> Format {
-        match path { Some(p) => Format::from_path(p), None => Format::Csv }
     }
 }
 
@@ -39,7 +47,12 @@ pub enum DataReader {
 }
 
 impl DataReader {
-    pub fn from_reader<R: Read + 'static>(r: R, fmt: Format, delim: Option<u8>, no_headers: bool) -> CliResult<DataReader> {
+    pub fn from_reader<R: Read + 'static>(
+        r: R,
+        fmt: Format,
+        delim: Option<u8>,
+        no_headers: bool,
+    ) -> CliResult<DataReader> {
         match fmt {
             Format::Csv | Format::Tsv => {
                 let rdr = csv::ReaderBuilder::new()
@@ -47,18 +60,28 @@ impl DataReader {
                     .has_headers(!no_headers)
                     .flexible(true)
                     .from_reader(Box::new(r) as Box<dyn Read>);
-                Ok(if fmt == Format::Tsv { DataReader::Tsv(rdr) } else { DataReader::Csv(rdr) })
+                Ok(if fmt == Format::Tsv {
+                    DataReader::Tsv(rdr)
+                } else {
+                    DataReader::Csv(rdr)
+                })
             }
             #[cfg(feature = "jsonl")]
             Format::Jsonl => Ok(DataReader::Jsonl(JsonlReader::new(r, no_headers)?)),
             #[cfg(feature = "parquet")]
-            Format::Parquet => {
-                Err(CliError::Other("Parquet reader must be created from a file path".into()))
-            }
+            Format::Parquet => Err(CliError::Other(
+                "Parquet reader must be created from a file path".into(),
+            )),
         }
     }
 
-    pub fn from_path(path: &str, fmt: Format, delim: Option<u8>, no_headers: bool) -> CliResult<DataReader> {
+    #[cfg(feature = "parquet")]
+    pub fn from_path(
+        path: &str,
+        fmt: Format,
+        delim: Option<u8>,
+        no_headers: bool,
+    ) -> CliResult<DataReader> {
         match fmt {
             Format::Csv | Format::Tsv => {
                 let file = std::fs::File::open(path)?;
@@ -111,13 +134,23 @@ pub enum DataWriter {
 }
 
 impl DataWriter {
-    pub fn from_writer<W: Write + 'static>(w: W, fmt: Format, delim: Option<u8>) -> CliResult<DataWriter> {
+    pub fn from_writer<W: Write + 'static>(
+        w: W,
+        fmt: Format,
+        delim: Option<u8>,
+    ) -> CliResult<DataWriter> {
         let delim = delim.unwrap_or(if fmt == Format::Tsv { b'\t' } else { b',' });
         match fmt {
             Format::Csv => Ok(DataWriter::Csv(
-                csv::WriterBuilder::new().delimiter(delim).from_writer(Box::new(w) as Box<dyn Write>))),
+                csv::WriterBuilder::new()
+                    .delimiter(delim)
+                    .from_writer(Box::new(w) as Box<dyn Write>),
+            )),
             Format::Tsv => Ok(DataWriter::Tsv(
-                csv::WriterBuilder::new().delimiter(delim).from_writer(Box::new(w) as Box<dyn Write>))),
+                csv::WriterBuilder::new()
+                    .delimiter(delim)
+                    .from_writer(Box::new(w) as Box<dyn Write>),
+            )),
             #[cfg(feature = "jsonl")]
             Format::Jsonl => Ok(DataWriter::Jsonl(JsonlWriter::new(w))),
             #[cfg(feature = "parquet")]
@@ -127,11 +160,13 @@ impl DataWriter {
 
     pub fn from_path(path: &str, fmt: Format, delim: Option<u8>) -> CliResult<DataWriter> {
         match fmt {
-            Format::Csv | Format::Tsv => { DataWriter::from_writer(std::fs::File::create(path)?, fmt, delim) }
+            Format::Csv | Format::Tsv => {
+                DataWriter::from_writer(std::fs::File::create(path)?, fmt, delim)
+            }
             #[cfg(feature = "jsonl")]
-            Format::Jsonl => { DataWriter::from_writer(std::fs::File::create(path)?, fmt, delim) }
+            Format::Jsonl => DataWriter::from_writer(std::fs::File::create(path)?, fmt, delim),
             #[cfg(feature = "parquet")]
-            Format::Parquet => { Ok(DataWriter::Parquet(ParquetWriter::from_path(path)?)) }
+            Format::Parquet => Ok(DataWriter::Parquet(ParquetWriter::from_path(path)?)),
         }
     }
 
@@ -186,7 +221,9 @@ impl JsonlReader {
             buf: Vec::new(),
             no_headers,
         };
-        if !no_headers { reader.read_headers()?; }
+        if !no_headers {
+            reader.read_headers()?;
+        }
         Ok(reader)
     }
 
@@ -194,15 +231,23 @@ impl JsonlReader {
         self.line.clear();
         self.reader.read_line(&mut self.line)?;
         let line = self.line.trim();
-        if line.is_empty() { return Ok(()); }
+        if line.is_empty() {
+            return Ok(());
+        }
         let v: serde_json::Value = serde_json::from_str(line)?;
-        let obj = v.as_object().ok_or_else(|| CliError::Other("JSONL root must be object".into()))?;
-        for key in obj.keys() { self.headers.push_field(key.as_bytes()); }
+        let obj = v
+            .as_object()
+            .ok_or_else(|| CliError::Other("JSONL root must be object".into()))?;
+        for key in obj.keys() {
+            self.headers.push_field(key.as_bytes());
+        }
         self.buf = line.as_bytes().to_vec();
         Ok(())
     }
 
-    pub fn headers(&self) -> CliResult<ByteRecord> { Ok(self.headers.clone()) }
+    pub fn headers(&self) -> CliResult<ByteRecord> {
+        Ok(self.headers.clone())
+    }
 
     pub fn read_byte_record(&mut self, rec: &mut ByteRecord) -> CliResult<bool> {
         rec.clear();
@@ -214,9 +259,13 @@ impl JsonlReader {
         loop {
             self.line.clear();
             let n = self.reader.read_line(&mut self.line)?;
-            if n == 0 { return Ok(false); }
+            if n == 0 {
+                return Ok(false);
+            }
             let line = self.line.trim();
-            if line.is_empty() { continue; }
+            if line.is_empty() {
+                continue;
+            }
             self.json_to_record(line.as_bytes(), rec)?;
             return Ok(true);
         }
@@ -224,12 +273,17 @@ impl JsonlReader {
 
     fn json_to_record(&self, data: &[u8], rec: &mut ByteRecord) -> CliResult<()> {
         let v: serde_json::Value = serde_json::from_slice(data)?;
-        let obj = v.as_object().ok_or_else(|| CliError::Other("JSONL root must be object".into()))?;
+        let obj = v
+            .as_object()
+            .ok_or_else(|| CliError::Other("JSONL root must be object".into()))?;
         if self.no_headers {
-            for val in obj.values() { rec.push_field(&json_val_bytes(val)); }
+            for val in obj.values() {
+                rec.push_field(&json_val_bytes(val));
+            }
         } else {
             for h in self.headers.iter() {
-                let key = std::str::from_utf8(h).map_err(|e| CliError::Other(format!("UTF-8: {e}")))?;
+                let key =
+                    std::str::from_utf8(h).map_err(|e| CliError::Other(format!("UTF-8: {e}")))?;
                 match obj.get(key) {
                     Some(val) => rec.push_field(&json_val_bytes(val)),
                     None => rec.push_field(b""),
@@ -253,28 +307,42 @@ fn json_val_bytes(val: &serde_json::Value) -> Vec<u8> {
 
 // === JSONL Writer ===
 #[cfg(feature = "jsonl")]
-pub struct JsonlWriter { writer: Box<dyn Write>, headers: Option<ByteRecord> }
+pub struct JsonlWriter {
+    writer: Box<dyn Write>,
+    headers: Option<ByteRecord>,
+}
 
 #[cfg(feature = "jsonl")]
 impl JsonlWriter {
     pub fn new<W: Write + 'static>(w: W) -> JsonlWriter {
-        JsonlWriter { writer: Box::new(w) as Box<dyn Write>, headers: None }
+        JsonlWriter {
+            writer: Box::new(w) as Box<dyn Write>,
+            headers: None,
+        }
     }
 
     pub fn set_headers(&mut self, headers: &ByteRecord) -> CliResult<()> {
-        self.headers = Some(headers.clone()); Ok(())
+        self.headers = Some(headers.clone());
+        Ok(())
     }
 
     pub fn write_byte_record(&mut self, rec: &ByteRecord) -> CliResult<()> {
         if let Some(headers) = &self.headers {
             write!(self.writer, "{{")?;
             for (i, h) in headers.iter().enumerate() {
-                if i > 0 { write!(self.writer, ",")?; }
-                let key = std::str::from_utf8(h).map_err(|e| CliError::Other(format!("UTF-8: {e}")))?;
+                if i > 0 {
+                    write!(self.writer, ",")?;
+                }
+                let key =
+                    std::str::from_utf8(h).map_err(|e| CliError::Other(format!("UTF-8: {e}")))?;
                 write!(self.writer, "\"{}\":", key)?;
                 if i < rec.len() {
-                    let val = std::str::from_utf8(&rec[i]).map_err(|e| CliError::Other(format!("UTF-8: {e}")))?;
-                    serde_json::to_writer(&mut self.writer, &serde_json::Value::String(val.to_owned()))?;
+                    let val = std::str::from_utf8(&rec[i])
+                        .map_err(|e| CliError::Other(format!("UTF-8: {e}")))?;
+                    serde_json::to_writer(
+                        &mut self.writer,
+                        &serde_json::Value::String(val.to_owned()),
+                    )?;
                 } else {
                     serde_json::to_writer(&mut self.writer, &serde_json::Value::Null)?;
                 }
@@ -283,16 +351,24 @@ impl JsonlWriter {
         } else {
             write!(self.writer, "[")?;
             for (i, f) in rec.iter().enumerate() {
-                if i > 0 { write!(self.writer, ",")?; }
-                let val = std::str::from_utf8(f).map_err(|e| CliError::Other(format!("UTF-8: {e}")))?;
-                serde_json::to_writer(&mut self.writer, &serde_json::Value::String(val.to_owned()))?;
+                if i > 0 {
+                    write!(self.writer, ",")?;
+                }
+                let val =
+                    std::str::from_utf8(f).map_err(|e| CliError::Other(format!("UTF-8: {e}")))?;
+                serde_json::to_writer(
+                    &mut self.writer,
+                    &serde_json::Value::String(val.to_owned()),
+                )?;
             }
             writeln!(self.writer, "]")?;
         }
         Ok(())
     }
 
-    pub fn flush(&mut self) -> CliResult<()> { Ok(self.writer.flush()?) }
+    pub fn flush(&mut self) -> CliResult<()> {
+        Ok(self.writer.flush()?)
+    }
 }
 
 // === Parquet Reader ===
@@ -345,12 +421,16 @@ impl ParquetReader {
             if self.row_idx < self.batch_records.len() {
                 rec.clear();
                 if let Some(Some(fields)) = self.batch_records.get(self.row_idx) {
-                    for f in fields { rec.push_field(f); }
+                    for f in fields {
+                        rec.push_field(f);
+                    }
                 }
                 self.row_idx += 1;
                 return Ok(true);
             }
-            if self.row_group >= self.num_row_groups { return Ok(false); }
+            if self.row_group >= self.num_row_groups {
+                return Ok(false);
+            }
             let iter = self.reader.get_row_iter(None)?;
             let mut batch = Vec::new();
             for row_res in iter {
@@ -392,11 +472,19 @@ pub struct ParquetWriter {
 #[cfg(feature = "parquet")]
 impl ParquetWriter {
     pub fn new<W: Write + 'static>(_w: W) -> CliResult<ParquetWriter> {
-        Ok(ParquetWriter { schema_headers: None, records: Vec::new(), output_path: None })
+        Ok(ParquetWriter {
+            schema_headers: None,
+            records: Vec::new(),
+            output_path: None,
+        })
     }
 
     pub fn from_path(path: &str) -> CliResult<ParquetWriter> {
-        Ok(ParquetWriter { schema_headers: None, records: Vec::new(), output_path: Some(path.to_owned()) })
+        Ok(ParquetWriter {
+            schema_headers: None,
+            records: Vec::new(),
+            output_path: Some(path.to_owned()),
+        })
     }
 
     pub fn set_schema(&mut self, headers: &ByteRecord) -> CliResult<()> {
@@ -410,36 +498,51 @@ impl ParquetWriter {
     }
 
     pub fn flush(&mut self) -> CliResult<()> {
-        if self.records.is_empty() { return Ok(()); }
+        if self.records.is_empty() {
+            return Ok(());
+        }
         let hdrs = match &self.schema_headers {
             Some(h) => h.clone(),
-            None => { let h = self.records[0].clone(); self.schema_headers = Some(h.clone()); h }
+            None => {
+                let h = self.records[0].clone();
+                self.schema_headers = Some(h.clone());
+                h
+            }
         };
         let ncols = hdrs.len();
-        let mut builders: Vec<arrow::array::GenericByteBuilder<arrow::array::types::Utf8Type>> =
-            (0..ncols).map(|_| arrow::array::GenericByteBuilder::<arrow::array::types::Utf8Type>::new()).collect();
+        let mut builders: Vec<arrow::array::GenericByteBuilder<arrow::array::types::Utf8Type>> = (0
+            ..ncols)
+            .map(|_| arrow::array::GenericByteBuilder::<arrow::array::types::Utf8Type>::new())
+            .collect();
         for rec in &self.records {
             for (i, b) in builders.iter_mut().enumerate() {
                 if i < rec.len() {
                     let s = String::from_utf8_lossy(&rec[i]);
                     b.append_value(&s);
-                } else { b.append_null(); }
+                } else {
+                    b.append_null();
+                }
             }
         }
-        let arrays: Vec<arrow::array::ArrayRef> = builders.into_iter()
+        let arrays: Vec<arrow::array::ArrayRef> = builders
+            .into_iter()
             .map(|mut b| std::sync::Arc::new(b.finish()) as arrow::array::ArrayRef)
             .collect();
-        let field_names: Vec<&str> = hdrs.iter()
+        let field_names: Vec<&str> = hdrs
+            .iter()
             .map(|h| std::str::from_utf8(h).unwrap_or("col"))
             .collect();
-        let fields: Vec<arrow::datatypes::Field> = field_names.iter()
+        let fields: Vec<arrow::datatypes::Field> = field_names
+            .iter()
             .map(|n| arrow::datatypes::Field::new(*n, arrow::datatypes::DataType::Utf8, true))
             .collect();
         let schema = arrow::datatypes::Schema::new(fields);
-        let batch = arrow::record_batch::RecordBatch::try_new(std::sync::Arc::new(schema.clone()), arrays)?;
+        let batch =
+            arrow::record_batch::RecordBatch::try_new(std::sync::Arc::new(schema.clone()), arrays)?;
         if let Some(path) = &self.output_path {
             let file = std::fs::File::create(path)?;
-            let mut writer = parquet::arrow::ArrowWriter::try_new(file, std::sync::Arc::new(schema), None)?;
+            let mut writer =
+                parquet::arrow::ArrowWriter::try_new(file, std::sync::Arc::new(schema), None)?;
             writer.write(&batch)?;
             writer.close()?;
         }

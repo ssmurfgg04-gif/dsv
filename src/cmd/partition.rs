@@ -1,5 +1,5 @@
-use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -7,29 +7,29 @@ use std::path::Path;
 use csv;
 use regex::Regex;
 
-use crate::CliResult;
 use crate::config::{Config, Delimiter};
 use crate::select::SelectColumns;
 use crate::util::FilenameTemplate;
+use crate::CliResult;
 use clap::Parser;
 
 #[derive(Parser, Clone, Debug)]
 pub struct Args {
-#[arg()]
+    #[arg()]
     pub arg_column: SelectColumns,
-#[arg()]
+    #[arg()]
     pub arg_outdir: String,
-#[arg()]
+    #[arg()]
     pub arg_input: Option<String>,
-#[arg(long = "filename", value_name = "arg", default_value = "{}.csv")]
+    #[arg(long = "filename", value_name = "arg", default_value = "{}.csv")]
     pub flag_filename: FilenameTemplate,
     #[arg(long = "prefix-length", value_name = "arg")]
     pub flag_prefix_length: Option<usize>,
-#[arg(long = "drop")]
+    #[arg(long = "drop")]
     pub flag_drop: bool,
-#[arg(short = 'n', long = "no-headers")]
+    #[arg(short = 'n', long = "no-headers")]
     pub flag_no_headers: bool,
-#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    #[arg(short = 'd', long = "delimiter", value_name = "arg")]
     pub flag_delimiter: Option<Delimiter>,
 }
 
@@ -53,11 +53,7 @@ impl Args {
     }
 
     /// Get the column to use as a key.
-    fn key_column(
-        &self,
-        rconfig: &Config,
-        headers: &csv::ByteRecord,
-    ) -> CliResult<usize> {
+    fn key_column(&self, rconfig: &Config, headers: &csv::ByteRecord) -> CliResult<usize> {
         let select_cols = rconfig.selection(headers)?;
         if select_cols.len() == 1 {
             Ok(select_cols[0])
@@ -74,8 +70,7 @@ impl Args {
         let key_col = self.key_column(&rconfig, &headers)?;
         let mut gen = WriterGenerator::new(self.flag_filename.clone());
 
-        let mut writers: HashMap<Vec<u8>, BoxedWriter> =
-            HashMap::new();
+        let mut writers: HashMap<Vec<u8>, BoxedWriter> = HashMap::new();
         let mut row = csv::ByteRecord::new();
         while rdr.read_byte_record(&mut row)? {
             // Decide what file to put this in.
@@ -83,28 +78,35 @@ impl Args {
             let key = match self.flag_prefix_length {
                 // We exceed --prefix-length, so ignore the extra bytes.
                 Some(len) if len < column.len() => &column[0..len],
-                _ => &column[..],
+                _ => column,
             };
             let mut entry = writers.entry(key.to_vec());
-            let wtr = match entry {
-                Entry::Occupied(ref mut occupied) => occupied.get_mut(),
-                Entry::Vacant(vacant) => {
-                    // We have a new key, so make a new writer.
-                    let mut wtr = gen.writer(&*self.arg_outdir, key)?;
-                    if !rconfig.no_headers {
-                        if self.flag_drop {
-                            wtr.write_record(headers.iter().enumerate()
-                                .filter_map(|(i, e)| if i != key_col { Some(e) } else { None }))?;
-                        } else {
-                            wtr.write_record(&headers)?;
+            let wtr =
+                match entry {
+                    Entry::Occupied(ref mut occupied) => occupied.get_mut(),
+                    Entry::Vacant(vacant) => {
+                        // We have a new key, so make a new writer.
+                        let mut wtr = gen.writer(&*self.arg_outdir, key)?;
+                        if !rconfig.no_headers {
+                            if self.flag_drop {
+                                wtr.write_record(headers.iter().enumerate().filter_map(
+                                    |(i, e)| if i != key_col { Some(e) } else { None },
+                                ))?;
+                            } else {
+                                wtr.write_record(&headers)?;
+                            }
                         }
+                        vacant.insert(wtr)
                     }
-                    vacant.insert(wtr)
-                }
-            };
+                };
             if self.flag_drop {
-                wtr.write_record(row.iter().enumerate()
-                    .filter_map(|(i, e)| if i != key_col { Some(e) } else { None }))?;
+                wtr.write_record(row.iter().enumerate().filter_map(|(i, e)| {
+                    if i != key_col {
+                        Some(e)
+                    } else {
+                        None
+                    }
+                }))?;
             } else {
                 wtr.write_byte_record(&row)?;
             }
@@ -113,7 +115,7 @@ impl Args {
     }
 }
 
-type BoxedWriter = csv::Writer<Box<dyn io::Write+'static>>;
+type BoxedWriter = csv::Writer<Box<dyn io::Write + 'static>>;
 
 /// Generates unique filenames based on CSV values.
 struct WriterGenerator {
@@ -126,7 +128,7 @@ struct WriterGenerator {
 impl WriterGenerator {
     fn new(template: FilenameTemplate) -> WriterGenerator {
         WriterGenerator {
-            template: template,
+            template,
             counter: 1,
             used: HashSet::new(),
             non_word_char: Regex::new(r"\W").unwrap(),
@@ -135,7 +137,8 @@ impl WriterGenerator {
 
     /// Create a CSV writer for `key`.  Does not add headers.
     fn writer<P>(&mut self, path: P, key: &[u8]) -> io::Result<BoxedWriter>
-        where P: AsRef<Path>
+    where
+        P: AsRef<Path>,
     {
         let unique_value = self.unique_value(key);
         self.template.writer(path.as_ref(), &unique_value)
@@ -147,13 +150,12 @@ impl WriterGenerator {
     fn unique_value(&mut self, key: &[u8]) -> String {
         // Sanitize our key.
         let utf8 = String::from_utf8_lossy(key);
-        let safe = self.non_word_char.replace_all(&*utf8, "").into_owned();
-        let base =
-            if safe.is_empty() {
-                "empty".to_owned()
-            } else {
-                safe
-            };
+        let safe = self.non_word_char.replace_all(&utf8, "").into_owned();
+        let base = if safe.is_empty() {
+            "empty".to_owned()
+        } else {
+            safe
+        };
 
         // Now check for collisions.
         if !self.used.contains(&base) {
@@ -161,7 +163,7 @@ impl WriterGenerator {
             base
         } else {
             loop {
-                let candidate = format!("{}_{}", &base, self.counter);
+                let candidate = format!("{}_{}", base, self.counter);
                 self.counter = self.counter.checked_add(1).unwrap_or_else(|| {
                     // We'll run out of other things long before we ever
                     // reach this, but we'll check just for correctness and
@@ -170,7 +172,7 @@ impl WriterGenerator {
                 });
                 if !self.used.contains(&candidate) {
                     self.used.insert(candidate.clone());
-                    return candidate
+                    return candidate;
                 }
             }
         }

@@ -122,6 +122,12 @@ dsv convert worldcitiespop.csv worldcitiespop.parquet
 dsv stats worldcitiespop.parquet --everything | dsv table
 ```
 
+## JSONL notes
+
+- Only `.jsonl` and `.ndjson` extensions are detected as JSONL. Plain `.json` files are treated as CSV — JSON (non line-delimited) files are **not** supported as input.
+- JSON objects are unordered maps. When reading JSONL, columns are derived from the first record's keys; records with extra keys extend the column set. When writing JSONL, keys are serialized in the order the columns were read (CSV header order, or insertion order for JSONL→JSONL).
+- To round-trip reliably between CSV and JSONL, keep column names unique and stable. Empty and non-UTF-8 fields are handled as JSON `null`.
+
 ## Performance
 
 dsv inherits xsv's zero-compromise performance model: constant-time indexing, streaming row processing, and minimal memory overhead. The `stats` command on a 3M-row CSV runs in ~8 seconds with an index. Parquet reads leverage Apache Arrow's columnar format for fast predicate pushdown and vectorized decoding.

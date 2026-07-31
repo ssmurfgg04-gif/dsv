@@ -6,27 +6,27 @@ use crossbeam_channel;
 use csv;
 use threadpool::ThreadPool;
 
-use crate::CliResult;
 use crate::config::{Config, Delimiter};
 use crate::index::Indexed;
 use crate::util::{self, FilenameTemplate};
+use crate::CliResult;
 use clap::Parser;
 
 #[derive(Parser, Clone, Debug)]
 pub struct Args {
-#[arg()]
+    #[arg()]
     pub arg_outdir: String,
-#[arg()]
+    #[arg()]
     pub arg_input: Option<String>,
     #[arg(short = 's', long = "size", value_name = "arg")]
     pub flag_size: usize,
-#[arg(short = 'j', long = "jobs", value_name = "arg", default_value_t = 0)]
+    #[arg(short = 'j', long = "jobs", value_name = "arg", default_value_t = 0)]
     pub flag_jobs: usize,
-#[arg(long = "filename", value_name = "arg", default_value = "{}.csv")]
+    #[arg(long = "filename", value_name = "arg", default_value = "{}.csv")]
     pub flag_filename: FilenameTemplate,
-#[arg(short = 'n', long = "no-headers")]
+    #[arg(short = 'n', long = "no-headers")]
     pub flag_no_headers: bool,
-#[arg(short = 'd', long = "delimiter", value_name = "arg")]
+    #[arg(short = 'd', long = "delimiter", value_name = "arg")]
     pub flag_delimiter: Option<Delimiter>,
 }
 
@@ -63,12 +63,8 @@ impl Args {
         Ok(())
     }
 
-    fn parallel_split(
-        &self,
-        idx: Indexed<fs::File, fs::File>,
-    ) -> CliResult<()> {
-        let nchunks = util::num_of_chunks(
-            idx.count() as usize, self.flag_size);
+    fn parallel_split(&self, idx: Indexed<fs::File, fs::File>) -> CliResult<()> {
+        let nchunks = util::num_of_chunks(idx.count() as usize, self.flag_size);
         let pool = ThreadPool::new(self.njobs());
         let (tx, rx) = crossbeam_channel::bounded::<()>(0);
         for i in 0..nchunks {
@@ -78,9 +74,7 @@ impl Args {
                 let conf = args.rconfig();
                 let mut idx = conf.indexed().unwrap().unwrap();
                 let headers = idx.byte_headers().unwrap().clone();
-                let mut wtr = args
-                    .new_writer(&headers, i * args.flag_size)
-                    .unwrap();
+                let mut wtr = args.new_writer(&headers, i * args.flag_size).unwrap();
 
                 idx.seek((i * args.flag_size) as u64).unwrap();
                 for row in idx.byte_records().take(args.flag_size) {
@@ -100,7 +94,7 @@ impl Args {
         &self,
         headers: &csv::ByteRecord,
         start: usize,
-    ) -> CliResult<csv::Writer<Box<dyn io::Write+'static>>> {
+    ) -> CliResult<csv::Writer<Box<dyn io::Write + 'static>>> {
         let dir = Path::new(&self.arg_outdir);
         let path = dir.join(self.flag_filename.filename(&format!("{}", start)));
         let spath = Some(path.display().to_string());

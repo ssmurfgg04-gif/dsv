@@ -1,7 +1,7 @@
-use csv::ByteRecord;
-use crate::CliResult;
 use crate::config::{Config, Delimiter};
+use crate::CliResult;
 use clap::Parser;
+use csv::ByteRecord;
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -25,7 +25,9 @@ pub fn run(args: &Args) -> CliResult<()> {
     let headers = rdr.byte_headers()?.clone();
     let mut rows: Vec<ByteRecord> = Vec::new();
     let mut rec = ByteRecord::new();
-    while rdr.read_byte_record(&mut rec)? { rows.push(rec.clone()); }
+    while rdr.read_byte_record(&mut rec)? {
+        rows.push(rec.clone());
+    }
 
     if args.flag_no_headers {
         let ncols = if rows.is_empty() { 0 } else { rows[0].len() };

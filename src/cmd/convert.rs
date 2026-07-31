@@ -1,6 +1,6 @@
-use crate::CliResult;
 use crate::config::Config;
 use crate::data::{DataWriter, Format};
+use crate::CliResult;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -34,12 +34,20 @@ pub fn run(args: &Args) -> CliResult<()> {
         .delimiter(args.flag_delimiter)
         .no_headers(args.flag_no_headers)
         .data_reader(in_fmt)?;
-    let headers = if !args.flag_no_headers { rdr.headers().ok() } else { None };
+    let headers = if !args.flag_no_headers {
+        rdr.headers().ok()
+    } else {
+        None
+    };
 
     let mut wtr = DataWriter::from_path(&args.arg_output, out_fmt, delim)?;
-    if let Some(ref h) = headers { wtr.write_headers(h)?; }
+    if let Some(ref h) = headers {
+        wtr.write_headers(h)?;
+    }
     let mut rec = csv::ByteRecord::new();
-    while rdr.read_byte_record(&mut rec)? { wtr.write_byte_record(&rec)?; }
+    while rdr.read_byte_record(&mut rec)? {
+        wtr.write_byte_record(&rec)?;
+    }
     wtr.flush()?;
     Ok(())
 }

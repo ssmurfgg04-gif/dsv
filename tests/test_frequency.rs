@@ -1,12 +1,11 @@
 use std::borrow::ToOwned;
-use std::collections::hash_map::{HashMap, Entry};
+use std::collections::hash_map::{Entry, HashMap};
 use std::process;
 
-use csv;
 use stats::Frequencies;
 
-use {Csv, CsvData, qcheck_sized};
-use workdir::Workdir;
+use crate::workdir::Workdir;
+use crate::{qcheck_sized, Csv, CsvData};
 
 fn setup(name: &str) -> (Workdir, process::Command) {
     let rows = vec![
@@ -31,7 +30,9 @@ fn setup(name: &str) -> (Workdir, process::Command) {
 #[test]
 fn frequency_no_headers() {
     let (wrk, mut cmd) = setup("frequency_no_headers");
-    cmd.args(&["--limit", "0"]).args(&["--select", "1"]).arg("--no-headers");
+    cmd.args(["--limit", "0"])
+        .args(["--select", "1"])
+        .arg("--no-headers");
 
     let mut got: Vec<Vec<String>> = wrk.read_stdout(&mut cmd);
     got = got.into_iter().skip(1).collect();
@@ -49,7 +50,9 @@ fn frequency_no_headers() {
 #[test]
 fn frequency_no_nulls() {
     let (wrk, mut cmd) = setup("frequency_no_nulls");
-    cmd.arg("--no-nulls").args(&["--limit", "0"]).args(&["--select", "h1"]);
+    cmd.arg("--no-nulls")
+        .args(["--limit", "0"])
+        .args(["--select", "h1"]);
 
     let mut got: Vec<Vec<String>> = wrk.read_stdout(&mut cmd);
     got.sort();
@@ -65,7 +68,7 @@ fn frequency_no_nulls() {
 #[test]
 fn frequency_nulls() {
     let (wrk, mut cmd) = setup("frequency_nulls");
-    cmd.args(&["--limit", "0"]).args(&["--select", "h1"]);
+    cmd.args(["--limit", "0"]).args(["--select", "h1"]);
 
     let mut got: Vec<Vec<String>> = wrk.read_stdout(&mut cmd);
     got.sort();
@@ -82,7 +85,7 @@ fn frequency_nulls() {
 #[test]
 fn frequency_limit() {
     let (wrk, mut cmd) = setup("frequency_limit");
-    cmd.args(&["--limit", "1"]);
+    cmd.args(["--limit", "1"]);
 
     let mut got: Vec<Vec<String>> = wrk.read_stdout(&mut cmd);
     got.sort();
@@ -97,21 +100,20 @@ fn frequency_limit() {
 #[test]
 fn frequency_asc() {
     let (wrk, mut cmd) = setup("frequency_asc");
-    cmd.args(&["--limit", "1"]).args(&["--select", "h2"]).arg("--asc");
+    cmd.args(["--limit", "1"])
+        .args(["--select", "h2"])
+        .arg("--asc");
 
     let mut got: Vec<Vec<String>> = wrk.read_stdout(&mut cmd);
     got.sort();
-    let expected = vec![
-        svec!["field", "value", "count"],
-        svec!["h2", "x", "1"],
-    ];
+    let expected = vec![svec!["field", "value", "count"], svec!["h2", "x", "1"]];
     assert_eq!(got, expected);
 }
 
 #[test]
 fn frequency_select() {
     let (wrk, mut cmd) = setup("frequency_select");
-    cmd.args(&["--limit", "0"]).args(&["--select", "h2"]);
+    cmd.args(["--limit", "0"]).args(["--select", "h2"]);
 
     let mut got: Vec<Vec<String>> = wrk.read_stdout(&mut cmd);
     got.sort();
@@ -136,7 +138,6 @@ fn prop_frequency() {
     qcheck_sized(p as fn(CsvData) -> bool, 2);
 }
 
-
 // This tests that running the frequency command on a CSV file with these two
 // rows does not burst in flames:
 //
@@ -150,8 +151,8 @@ fn prop_frequency() {
 fn frequency_bom() {
     let rows = CsvData {
         data: vec![
-            ::CsvRecord(vec!["\u{FEFF}".to_string()]),
-            ::CsvRecord(vec!["".to_string()]),
+            crate::CsvRecord(vec!["\u{FEFF}".to_string()]),
+            crate::CsvRecord(vec!["".to_string()]),
         ],
     };
     assert!(param_prop_frequency("prop_frequency", rows, false))
@@ -181,7 +182,7 @@ fn param_prop_frequency(name: &str, rows: CsvData, idx: bool) -> bool {
     }
 
     let mut cmd = wrk.command("frequency");
-    cmd.arg("in.csv").args(&["-j", "4"]).args(&["--limit", "0"]);
+    cmd.arg("in.csv").args(["-j", "4"]).args(["--limit", "0"]);
 
     let stdout = wrk.stdout::<String>(&mut cmd);
     let got_ftables = ftables_from_csv_string(stdout);
@@ -191,7 +192,7 @@ fn param_prop_frequency(name: &str, rows: CsvData, idx: bool) -> bool {
 
 type FTables = HashMap<String, Frequencies<String>>;
 
-#[derive(Deserialize)]
+#[derive(serde::Deserialize)]
 struct FRow {
     field: String,
     value: String,
@@ -245,7 +246,9 @@ fn ftables_from_csv_string(data: String) -> FTables {
 }
 
 fn freq_data<T>(ftable: &Frequencies<T>) -> Vec<(&T, u64)>
-        where T: ::std::hash::Hash + Ord + Clone {
+where
+    T: ::std::hash::Hash + Ord + Clone,
+{
     let mut freqs = ftable.most_frequent();
     freqs.sort();
     freqs

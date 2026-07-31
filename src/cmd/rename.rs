@@ -1,7 +1,7 @@
-use csv::ByteRecord;
-use crate::CliResult;
 use crate::config::{Config, Delimiter};
+use crate::CliResult;
 use clap::Parser;
+use csv::ByteRecord;
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -23,7 +23,9 @@ pub fn run(args: &Args) -> CliResult<()> {
     let mut wtr = Config::new(&args.flag_output).writer()?;
 
     let headers = rdr.byte_headers()?.clone();
-    let mapping: Vec<(String, String)> = args.arg_rename.split(',')
+    let mapping: Vec<(String, String)> = args
+        .arg_rename
+        .split(',')
         .map(|pair| {
             let parts: Vec<&str> = pair.split(':').collect();
             if parts.len() == 2 {
@@ -43,13 +45,19 @@ pub fn run(args: &Args) -> CliResult<()> {
     let mut new_headers = ByteRecord::new();
     for h in headers.iter() {
         let key = std::str::from_utf8(h).unwrap_or("");
-        let renamed = mapping.iter().find(|(a, _)| a == key).map(|(_, b)| b.as_str()).unwrap_or(key);
+        let renamed = mapping
+            .iter()
+            .find(|(a, _)| a == key)
+            .map(|(_, b)| b.as_str())
+            .unwrap_or(key);
         new_headers.push_field(renamed.as_bytes());
     }
     wtr.write_record(&new_headers)?;
 
     let mut rec = ByteRecord::new();
-    while rdr.read_byte_record(&mut rec)? { wtr.write_byte_record(&rec)?; }
+    while rdr.read_byte_record(&mut rec)? {
+        wtr.write_byte_record(&rec)?;
+    }
     wtr.flush()?;
     Ok(())
 }
