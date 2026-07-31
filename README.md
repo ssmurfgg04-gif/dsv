@@ -1,5 +1,7 @@
 # dsv — Data Swiss Knife
 
+[![CI](https://github.com/ssmurfgg04-gif/dsv/actions/workflows/ci.yml/badge.svg)](https://github.com/ssmurfgg04-gif/dsv/actions/workflows/ci.yml)
+
 A fast CSV, TSV, Parquet, and JSONL command line toolkit written in Rust.
 Modern fork of [BurntSushi/xsv](https://github.com/BurntSushi/xsv) (10.8K ★), merging all 33 unmerged PRs with Parquet/JSONL support, new commands, and modern dependencies.
 
@@ -130,7 +132,7 @@ dsv stats worldcitiespop.parquet --everything | dsv table
 
 ## Performance
 
-dsv inherits xsv's zero-compromise performance model: constant-time indexing, streaming row processing, and minimal memory overhead. The `stats` command on a 3M-row CSV runs in ~8 seconds with an index. Parquet reads leverage Apache Arrow's columnar format for fast predicate pushdown and vectorized decoding.
+dsv inherits xsv's zero-compromise performance model: constant-time indexing, streaming row processing, and minimal memory overhead. On the exact dataset used in xsv's original benchmarks, dsv beats upstream xsv on the same hardware on `sort`, numeric `sort`, `frequency`, and `stats` (up to 48% faster), and ties on `count`/`select`. Parquet reads leverage Apache Arrow's columnar format for fast predicate pushdown and vectorized decoding.
 
 Benchmarks are maintained at [BENCHMARKS.md](./BENCHMARKS.md).
 
