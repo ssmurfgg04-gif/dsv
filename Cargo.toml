@@ -4,6 +4,7 @@ version = "0.13.0"
 authors = ["dsv contributors", "Andrew Gallant <jamslam@gmail.com>"]
 description = "dsv (Data Swiss Knife) — a high-performance CSV, Parquet, and JSONL CLI toolkit. Modern xsv fork with all 33 community PRs merged."
 homepage = "https://github.com/ssmurfgg04-gif/dsv"
+documentation = "https://docs.rs/dsv"
 repository = "https://github.com/ssmurfgg04-gif/dsv"
 readme = "README.md"
 keywords = ["csv", "tsv", "parquet", "jsonl", "xsv"]

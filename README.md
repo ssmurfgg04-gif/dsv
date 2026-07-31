@@ -1,6 +1,9 @@
 # dsv — Data Swiss Knife
 
 [![CI](https://github.com/ssmurfgg04-gif/dsv/actions/workflows/ci.yml/badge.svg)](https://github.com/ssmurfgg04-gif/dsv/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/dsv.svg)](https://crates.io/crates/dsv)
+[![docs.rs](https://docs.rs/dsv/badge.svg)](https://docs.rs/dsv)
+[![License: MIT/Unlicense](https://img.shields.io/badge/license-MIT%2FUnlicense-blue.svg)](LICENSE-MIT)
 
 A fast CSV, TSV, Parquet, and JSONL command line toolkit written in Rust.
 Modern fork of [BurntSushi/xsv](https://github.com/BurntSushi/xsv) (10.8K ★), merging all 33 unmerged PRs with Parquet/JSONL support, new commands, and modern dependencies.
@@ -88,6 +91,22 @@ dsv transpose data.csv
 | MSRV 1.85 | ✗ | ✓ | ✓ | **✓** |
 
 **xsv** was archived in 2023. **qsv** adds heavy SQL, networking, and pandas-like features — great for ETL but not a drop-in xsv replacement. **xan** focuses on data journalism with Python integrations. **dsv** is the lean, modern evolution of xsv: same philosophy, more formats, community features merged.
+
+## Feature parity with xsv
+
+Every xsv command works exactly as documented upstream — same flags, same output format — so dsv is a drop-in replacement:
+
+| xsv command | dsv | Extras beyond xsv |
+|:---|:---:|:---|
+| `cat`, `count`, `fixlengths`, `flatten`, `fmt`, `frequency`, `headers`, `index`, `input`, `join`, `partition`, `reverse`, `sample`, `search`, `select`, `slice`, `sort`, `split`, `stats`, `table` | **✓** | |
+| `convert` (CSV ⇄ TSV ⇄ JSONL ⇄ Parquet) | **✓** | new |
+| `dedup` (remove duplicate rows) | **✓** | new |
+| `exclude` (drop rows matching a regex) | **✓** | new |
+| `fill` (forward/back-fill empty cells) | **✓** | new |
+| `rename` (rename column headers) | **✓** | new |
+| `transpose` (swap rows and columns) | **✓** | new |
+
+In addition, all 33 community PRs that sat unmerged in xsv's upstream repository are merged here, and every command also accepts Parquet and JSONL input where it makes sense (e.g. `stats`, `select`, `search`).
 
 ## Whirlwind tour
 
