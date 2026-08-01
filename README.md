@@ -149,6 +149,23 @@ dsv stats worldcitiespop.parquet --everything | dsv table
 - JSON objects are unordered maps. When reading JSONL, columns are derived from the first record's keys; records with extra keys extend the column set. When writing JSONL, keys are serialized in the order the columns were read (CSV header order, or insertion order for JSONL→JSONL).
 - To round-trip reliably between CSV and JSONL, keep column names unique and stable. Empty and non-UTF-8 fields are handled as JSON `null`.
 
+## Gzip support
+
+Any `.gz` input file is transparently decompressed, and writing to a `.gz` path transparently compresses. This works for every command (`cat`, `select`, `search`, `stats`, `convert`, …) and across all formats (CSV, TSV, JSONL, Parquet):
+
+```bash
+# Read gzipped CSV
+dsv stats data.csv.gz --everything | dsv table
+
+# Write gzipped output
+dsv select name,age data.csv -o data.csv.gz
+
+# Convert gzipped CSV to JSONL
+dsv convert data.csv.gz data.jsonl
+```
+
+Gzip is detected purely by the `.gz` extension (e.g. `data.tsv.gz` still uses tab delimiters). Reading from stdin and writing to stdout behave as before.
+
 ## Performance
 
 dsv inherits xsv's zero-compromise performance model: constant-time indexing, streaming row processing, and minimal memory overhead. On the exact dataset used in xsv's original benchmarks, dsv beats upstream xsv on the same hardware on `sort`, numeric `sort`, `frequency`, and `stats` (up to 48% faster), and ties on `count`/`select`. Parquet reads leverage Apache Arrow's columnar format for fast predicate pushdown and vectorized decoding.

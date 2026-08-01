@@ -9,6 +9,37 @@ use std::io::{BufRead, BufReader};
 use crate::CliError;
 use crate::CliResult;
 
+fn strip_gz(p: &str) -> String {
+    let l = p.to_lowercase();
+    if l.ends_with(".gz") {
+        p[..p.len() - 3].to_owned()
+    } else {
+        p.to_owned()
+    }
+}
+
+#[cfg(feature = "parquet")]
+fn open_gzip(path: &str) -> std::io::Result<Box<dyn Read>> {
+    let file = std::fs::File::open(path)?;
+    if strip_gz(path) != path {
+        Ok(Box::new(flate2::read::MultiGzDecoder::new(file)))
+    } else {
+        Ok(Box::new(file))
+    }
+}
+
+fn open_gzip_write(path: &str) -> std::io::Result<Box<dyn Write>> {
+    let file = std::fs::File::create(path)?;
+    if strip_gz(path) != path {
+        Ok(Box::new(flate2::write::GzEncoder::new(
+            file,
+            flate2::Compression::default(),
+        )))
+    } else {
+        Ok(Box::new(file))
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Format {
     Csv,
@@ -21,7 +52,8 @@ pub enum Format {
 
 impl Format {
     pub fn from_path<P: AsRef<Path>>(path: P) -> Format {
-        let p = path.as_ref().display().to_string().to_lowercase();
+        let raw = path.as_ref().display().to_string();
+        let p = strip_gz(&raw).to_lowercase();
         if p.ends_with(".tsv") || p.ends_with(".tab") {
             return Format::Tsv;
         }
@@ -84,12 +116,12 @@ impl DataReader {
     ) -> CliResult<DataReader> {
         match fmt {
             Format::Csv | Format::Tsv => {
-                let file = std::fs::File::open(path)?;
+                let file = open_gzip(path)?;
                 DataReader::from_reader(file, fmt, delim, no_headers)
             }
             #[cfg(feature = "jsonl")]
             Format::Jsonl => {
-                let file = std::fs::File::open(path)?;
+                let file = open_gzip(path)?;
                 DataReader::from_reader(file, fmt, delim, no_headers)
             }
             #[cfg(feature = "parquet")]
@@ -161,10 +193,10 @@ impl DataWriter {
     pub fn from_path(path: &str, fmt: Format, delim: Option<u8>) -> CliResult<DataWriter> {
         match fmt {
             Format::Csv | Format::Tsv => {
-                DataWriter::from_writer(std::fs::File::create(path)?, fmt, delim)
+                DataWriter::from_writer(open_gzip_write(path)?, fmt, delim)
             }
             #[cfg(feature = "jsonl")]
-            Format::Jsonl => DataWriter::from_writer(std::fs::File::create(path)?, fmt, delim),
+            Format::Jsonl => DataWriter::from_writer(open_gzip_write(path)?, fmt, delim),
             #[cfg(feature = "parquet")]
             Format::Parquet => Ok(DataWriter::Parquet(ParquetWriter::from_path(path)?)),
         }

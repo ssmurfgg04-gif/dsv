@@ -71,11 +71,7 @@ impl Config {
             Some(ref s) if s.deref() == "-" => (None, b','),
             Some(ref s) => {
                 let path = PathBuf::from(s);
-                let delim = if path.extension().is_some_and(|v| v == "tsv" || v == "tab") {
-                    b'\t'
-                } else {
-                    b','
-                };
+                let delim = if is_tsv_path(&path) { b'\t' } else { b',' };
                 (Some(path), delim)
             }
         };
@@ -193,14 +189,14 @@ impl Config {
     pub fn reader(&self) -> io::Result<csv::Reader<Box<dyn io::Read + 'static>>> {
         #[cfg(feature = "parquet")]
         if let Some(ref p) = self.path {
-            let name = p.display().to_string().to_lowercase();
+            let name = strip_gz_ext(p.display().to_string()).to_lowercase();
             if name.ends_with(".parquet") || name.ends_with(".par") {
                 return self.parquet_csv_reader();
             }
         }
         #[cfg(feature = "jsonl")]
         if let Some(ref p) = self.path {
-            let name = p.display().to_string().to_lowercase();
+            let name = strip_gz_ext(p.display().to_string()).to_lowercase();
             if name.ends_with(".jsonl") || name.ends_with(".ndjson") {
                 return self.jsonl_csv_reader();
             }
@@ -353,7 +349,13 @@ impl Config {
         Ok(match self.path {
             None => Box::new(io::stdin()),
             Some(ref p) => match fs::File::open(p) {
-                Ok(x) => Box::new(x),
+                Ok(x) => {
+                    if is_gzip_path(p) {
+                        Box::new(flate2::read::MultiGzDecoder::new(x))
+                    } else {
+                        Box::new(x)
+                    }
+                }
                 Err(err) => {
                     let msg = format!("failed to open {}: {}", p.display(), err);
                     return Err(io::Error::new(io::ErrorKind::NotFound, msg));
@@ -376,7 +378,17 @@ impl Config {
     pub fn io_writer(&self) -> io::Result<Box<dyn io::Write + 'static>> {
         Ok(match self.path {
             None => Box::new(io::stdout()),
-            Some(ref p) => Box::new(fs::File::create(p)?),
+            Some(ref p) => {
+                let file = fs::File::create(p)?;
+                if is_gzip_path(p) {
+                    Box::new(flate2::write::GzEncoder::new(
+                        file,
+                        flate2::Compression::default(),
+                    ))
+                } else {
+                    Box::new(file)
+                }
+            }
         })
     }
 
@@ -391,5 +403,30 @@ impl Config {
             .escape(self.escape.unwrap_or(b'\\'))
             .buffer_capacity(32 * (1 << 10))
             .from_writer(wtr)
+    }
+}
+
+fn is_gzip_path(p: &std::path::Path) -> bool {
+    p.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.to_lowercase().ends_with(".gz"))
+}
+
+fn is_tsv_path(p: &std::path::Path) -> bool {
+    let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    let lower = name.to_lowercase();
+    let stem = if lower.ends_with(".gz") {
+        &lower[..lower.len() - 3]
+    } else {
+        &lower
+    };
+    stem.ends_with(".tsv") || stem.ends_with(".tab")
+}
+
+fn strip_gz_ext(s: String) -> String {
+    if s.to_lowercase().ends_with(".gz") && s.len() > 3 {
+        s[..s.len() - 3].to_owned()
+    } else {
+        s
     }
 }
