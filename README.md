@@ -11,7 +11,20 @@ Modern fork of [BurntSushi/xsv](https://github.com/BurntSushi/xsv) (10.8K ★), 
 ## Install
 
 ```bash
+# From crates.io (with Parquet + JSONL support)
 cargo install dsv
+
+# Pre-built binary via cargo-binstall
+cargo binstall dsv
+
+# Homebrew (macOS, Intel + Apple Silicon)
+brew install ssmurfgg04-gif/tap/dsv
+
+# Arch Linux (AUR)
+yay -S dsv-bin
+
+# Windows (Scoop)
+scoop install https://github.com/ssmurfgg04-gif/dsv/raw/main/dist/scoop/dsv.json
 ```
 
 Or download a [pre-built binary](https://github.com/ssmurfgg04-gif/dsv/releases).

@@ -1,0 +1,16 @@
+# Maintainer: dsv <ssmurfgg04@gmail.com>
+pkgname=dsv-bin
+pkgver=0.13.1
+pkgrel=1
+pkgdesc="dsv (Data Swiss Knife) — a high-performance CSV, Parquet, and JSONL CLI toolkit. Modern xsv fork."
+arch=('x86_64')
+url="https://github.com/ssmurfgg04-gif/dsv"
+license=('MIT' 'Unlicense')
+depends=('glibc')
+options=('!strip')
+source=("dsv-x86_64-unknown-linux-gnu::https://github.com/ssmurfgg04-gif/dsv/releases/download/v${pkgver}/dsv-x86_64-unknown-linux-gnu")
+sha256sums=('e40d84e5d04664d83606b1ea3a2b2598dfa3316cf8080be7c1680b37df9420df')
+
+package() {
+  install -Dm755 "${srcdir}/dsv-x86_64-unknown-linux-gnu" "${pkgdir}/usr/bin/dsv"
+}

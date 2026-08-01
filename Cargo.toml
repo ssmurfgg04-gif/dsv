@@ -21,6 +21,10 @@ test = false
 bench = false
 doctest = false
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/{ version }/dsv-{ target }{ binary-ext }"
+pkg-fmt = "bin"
+
 [[test]]
 name = "tests"
 

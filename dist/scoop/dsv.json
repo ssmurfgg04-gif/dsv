@@ -1,0 +1,27 @@
+{
+    "version": "0.13.1",
+    "description": "dsv (Data Swiss Knife) — a high-performance CSV, Parquet, and JSONL CLI toolkit. Modern xsv fork.",
+    "homepage": "https://github.com/ssmurfgg04-gif/dsv",
+    "license": "MIT",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/ssmurfgg04-gif/dsv/releases/download/v0.13.1/dsv-x86_64-pc-windows-msvc.exe",
+            "hash": "fb147384ce5260fabbecdf59a62332c5ebb12e69d90b29b5c51b9d79173a1069",
+            "bin": ["dsv-x86_64-pc-windows-msvc.exe", "dsv"]
+        }
+    },
+    "checkver": {
+        "github": "https://github.com/ssmurfgg04-gif/dsv"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/ssmurfgg04-gif/dsv/releases/download/v$version/dsv-x86_64-pc-windows-msvc.exe"
+            }
+        },
+        "hash": {
+            "url": "https://github.com/ssmurfgg04-gif/dsv/releases/download/v$version/dsv-SHA256SUMS.txt",
+            "find": "([a-f0-9]{64})  dsv-x86_64-pc-windows-msvc.exe"
+        }
+    }
+}
