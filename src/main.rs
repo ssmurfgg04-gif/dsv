@@ -44,6 +44,7 @@ macro_rules! command_list {
     rename      Rename column headers
     reverse     Reverse rows of CSV data
     sample      Randomly sample CSV data
+    schema      Infer column types
     search      Search CSV data with regexes
     select      Select columns from CSV
     slice       Slice records from CSV
@@ -52,6 +53,7 @@ macro_rules! command_list {
     stats       Compute basic statistics
     table       Align CSV data into columns
     transpose   Transpose rows and columns
+    validate    Validate CSV data
 "
     };
 }
@@ -115,6 +117,8 @@ enum Command {
     Reverse(cmd::reverse::Args),
     #[command(about = "Randomly sample CSV data")]
     Sample(cmd::sample::Args),
+    #[command(about = "Infer column types")]
+    Schema(cmd::schema::Args),
     #[command(about = "Search CSV data with regexes")]
     Search(cmd::search::Args),
     #[command(about = "Select columns from CSV")]
@@ -131,6 +135,8 @@ enum Command {
     Table(cmd::table::Args),
     #[command(about = "Transpose rows and columns")]
     Transpose(cmd::transpose::Args),
+    #[command(about = "Validate CSV data")]
+    Validate(cmd::validate::Args),
 }
 
 fn main() {
@@ -191,6 +197,7 @@ impl Command {
             Command::Rename(args) => cmd::rename::run(&args),
             Command::Reverse(args) => cmd::reverse::run(&args),
             Command::Sample(args) => cmd::sample::run(&args),
+            Command::Schema(args) => cmd::schema::run(&args),
             Command::Search(args) => cmd::search::run(&args),
             Command::Select(args) => cmd::select::run(&args),
             Command::Slice(args) => cmd::slice::run(&args),
@@ -199,6 +206,7 @@ impl Command {
             Command::Stats(args) => cmd::stats::run(&args),
             Command::Table(args) => cmd::table::run(&args),
             Command::Transpose(args) => cmd::transpose::run(&args),
+            Command::Validate(args) => cmd::validate::run(&args),
         }
     }
 }

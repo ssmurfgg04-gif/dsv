@@ -38,6 +38,7 @@ Or download a [pre-built binary](https://github.com/ssmurfgg04-gif/dsv/releases)
 | `rename` | Rename column headers |
 | `reverse` | Reverse row order |
 | `sample` | Randomly sample rows |
+| `schema` | Infer column types |
 | `search` | Regex search across fields |
 | `select` | Select or reorder columns |
 | `slice` | Slice rows (constant-time with index) |
@@ -46,6 +47,7 @@ Or download a [pre-built binary](https://github.com/ssmurfgg04-gif/dsv/releases)
 | `stats` | Per-column statistics (mean, stddev, median, etc.) |
 | `table` | Aligned column output via elastic tabstops |
 | `transpose` | Swap rows and columns |
+| `validate` | Check records have consistent field counts |
 
 ## Quick examples
 
@@ -85,7 +87,7 @@ dsv transpose data.csv
 | Parquet support | ✗ | ✗ | ✗ | **✓** |
 | JSONL support | ✗ | ✗ | ✗ | **✓** |
 | 33 community PRs merged | ✗ | partial | partial | **✓** |
-| Lean command set (26) | ✓ | ✗ (40+) | ✗ (30+) | **✓** |
+| Lean command set (28) | ✓ | ✗ (40+) | ✗ (30+) | **✓** |
 | Rust edition 2021 | ✗ | ✓ | ✓ | **✓** |
 | clap v4 CLI | ✗ | ✓ | ✗ | **✓** |
 | MSRV 1.85 | ✗ | ✓ | ✓ | **✓** |
@@ -105,6 +107,8 @@ Every xsv command works exactly as documented upstream — same flags, same outp
 | `fill` (forward/back-fill empty cells) | **✓** | new |
 | `rename` (rename column headers) | **✓** | new |
 | `transpose` (swap rows and columns) | **✓** | new |
+| `schema` (infer column types) | **✓** | new |
+| `validate` (check record field counts) | **✓** | new |
 
 In addition, all 33 community PRs that sat unmerged in xsv's upstream repository are merged here, and every command also accepts Parquet and JSONL input where it makes sense (e.g. `stats`, `select`, `search`).
 

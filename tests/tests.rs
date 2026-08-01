@@ -36,6 +36,7 @@ mod test_index;
 mod test_join;
 mod test_partition;
 mod test_reverse;
+mod test_schema_validate;
 mod test_search;
 mod test_select;
 mod test_slice;

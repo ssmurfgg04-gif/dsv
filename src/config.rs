@@ -423,6 +423,7 @@ fn is_tsv_path(p: &std::path::Path) -> bool {
     stem.ends_with(".tsv") || stem.ends_with(".tab")
 }
 
+#[cfg(any(feature = "parquet", feature = "jsonl"))]
 fn strip_gz_ext(s: String) -> String {
     if s.to_lowercase().ends_with(".gz") && s.len() > 3 {
         s[..s.len() - 3].to_owned()
