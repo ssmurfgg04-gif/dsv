@@ -1,14 +1,20 @@
-# dsv — Data Swiss Knife
+<div align="center">
 
-[![CI](https://github.com/ssmurfgg04-gif/dsv/actions/workflows/ci.yml/badge.svg)](https://github.com/ssmurfgg04-gif/dsv/actions/workflows/ci.yml)
-[![crates.io](https://img.shields.io/crates/v/dsv.svg)](https://crates.io/crates/dsv)
-[![docs.rs](https://docs.rs/dsv/badge.svg)](https://docs.rs/dsv)
-[![License: MIT/Unlicense](https://img.shields.io/badge/license-MIT%2FUnlicense-blue.svg)](LICENSE-MIT)
+<img src="assets/banner.svg" width="100%" alt="dsv — arctic banner: the data swiss knife, CSV Parquet JSONL at Rust speed" />
 
-A fast CSV, TSV, Parquet, and JSONL command line toolkit written in Rust.
+**A fast CSV, TSV, Parquet, and JSONL command line toolkit written in Rust.**
 Modern fork of [BurntSushi/xsv](https://github.com/BurntSushi/xsv) (10.8K ★), merging all 33 unmerged PRs with Parquet/JSONL support, new commands, and modern dependencies.
 
-## Install
+[![CI](https://github.com/ssmurfgg04-gif/dsv/actions/workflows/ci.yml/badge.svg)](https://github.com/ssmurfgg04-gif/dsv/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/dsv.svg?color=DEA584)](https://crates.io/crates/dsv)
+[![docs.rs](https://img.shields.io/docs/rs/dsv?color=7CDBF5)](https://docs.rs/dsv)
+[![License: MIT/Unlicense](https://img.shields.io/badge/license-MIT%2FUnlicense-2EA043.svg)](LICENSE-MIT)
+[![stars](https://img.shields.io/github/stars/ssmurfgg04-gif/dsv?color=FF9E1B&label=%E2%98%85%20stars)](https://github.com/ssmurfgg04-gif/dsv/stargazers)
+[![last commit](https://img.shields.io/github/last-commit/ssmurfgg04-gif/dsv?color=1E5C8A)](https://github.com/ssmurfgg04-gif/dsv/commits/master)
+
+</div>
+
+## 📦 Install
 
 ```bash
 # From crates.io (with Parquet + JSONL support)
@@ -29,7 +35,7 @@ scoop install https://github.com/ssmurfgg04-gif/dsv/raw/main/dist/scoop/dsv.json
 
 Or download a [pre-built binary](https://github.com/ssmurfgg04-gif/dsv/releases).
 
-## Commands
+## 🗡️ Commands
 
 | Command | Description |
 |---------|-------------|
@@ -62,7 +68,7 @@ Or download a [pre-built binary](https://github.com/ssmurfgg04-gif/dsv/releases)
 | `transpose` | Swap rows and columns |
 | `validate` | Check records have consistent field counts |
 
-## Quick examples
+## ⚡ Quick examples
 
 ```bash
 # Stats on a CSV
@@ -90,7 +96,7 @@ dsv rename 'old_name:new_name' data.csv
 dsv transpose data.csv
 ```
 
-## Why dsv over xsv, qsv, or xan?
+## 🥊 Why dsv over xsv, qsv, or xan?
 
 **dsv fills the gap** between the archived xsv and the bloated forks:
 
@@ -107,7 +113,7 @@ dsv transpose data.csv
 
 **xsv** was archived in 2023. **qsv** adds heavy SQL, networking, and pandas-like features — great for ETL but not a drop-in xsv replacement. **xan** focuses on data journalism with Python integrations. **dsv** is the lean, modern evolution of xsv: same philosophy, more formats, community features merged.
 
-## Feature parity with xsv
+## 🔁 Feature parity with xsv
 
 Every xsv command works exactly as documented upstream — same flags, same output format — so dsv is a drop-in replacement:
 
@@ -125,7 +131,7 @@ Every xsv command works exactly as documented upstream — same flags, same outp
 
 In addition, all 33 community PRs that sat unmerged in xsv's upstream repository are merged here, and every command also accepts Parquet and JSONL input where it makes sense (e.g. `stats`, `select`, `search`).
 
-## Whirlwind tour
+## 🌪️ Whirlwind tour
 
 ```bash
 # Download sample data
@@ -160,13 +166,13 @@ dsv convert worldcitiespop.csv worldcitiespop.parquet
 dsv stats worldcitiespop.parquet --everything | dsv table
 ```
 
-## JSONL notes
+## 📋 JSONL notes
 
 - Only `.jsonl` and `.ndjson` extensions are detected as JSONL. Plain `.json` files are treated as CSV — JSON (non line-delimited) files are **not** supported as input.
 - JSON objects are unordered maps. When reading JSONL, columns are derived from the first record's keys; records with extra keys extend the column set. When writing JSONL, keys are serialized in the order the columns were read (CSV header order, or insertion order for JSONL→JSONL).
 - To round-trip reliably between CSV and JSONL, keep column names unique and stable. Empty and non-UTF-8 fields are handled as JSON `null`.
 
-## Gzip support
+## 🗜️ Gzip support
 
 Any `.gz` input file is transparently decompressed, and writing to a `.gz` path transparently compresses. This works for every command (`cat`, `select`, `search`, `stats`, `convert`, …) and across all formats (CSV, TSV, JSONL, Parquet):
 
@@ -183,18 +189,26 @@ dsv convert data.csv.gz data.jsonl
 
 Gzip is detected purely by the `.gz` extension (e.g. `data.tsv.gz` still uses tab delimiters). Reading from stdin and writing to stdout behave as before.
 
-## Performance
+## ⏱️ Performance
 
 dsv inherits xsv's zero-compromise performance model: constant-time indexing, streaming row processing, and minimal memory overhead. On the exact dataset used in xsv's original benchmarks, dsv beats upstream xsv on the same hardware on `sort`, numeric `sort`, `frequency`, and `stats` (up to 48% faster), and ties on `count`/`select`. Parquet reads leverage Apache Arrow's columnar format for fast predicate pushdown and vectorized decoding.
 
 Benchmarks are maintained at [BENCHMARKS.md](./BENCHMARKS.md).
 
-## Motivation
+## 💡 Motivation
 
 When handed a 40GB CSV file, existing tools were too slow or inflexible. xsv solved this with indexing, slicing, and composable commands. dsv extends that foundation to modern data formats (Parquet, JSONL) while merging community contributions that sat unmerged for years. If you work with tabular data on the command line, dsv is the tool xsv should have become.
 
-## License
+## 📜 License
 
 Dual-licensed under MIT or [UNLICENSE](https://unlicense.org/).
 
 dsv is a fork of [BurntSushi/xsv](https://github.com/BurntSushi/xsv) by Andrew Gallant (BurntSushi).
+
+---
+
+<div align="center">
+
+<sub>🐧 part of <a href="https://github.com/ssmurfgg04-gif">the ice shelf</a> · cold code, warm commits ❄️</sub>
+
+</div>
